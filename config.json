@@ -1,0 +1,17 @@
+{
+  "project_name": "JENPEX Vision - Monitor de Ocupação",
+  "room_name": "Sala de Exposição JENPEX",
+  "room_capacity": 25,
+  "warning_threshold_pct": 80,
+  "camera_source": 0,
+  "camera_width": 640,
+  "camera_height": 480,
+  "model_type": "auto",
+  "confidence_threshold": 0.45,
+  "line_orientation": "horizontal",
+  "line_position_pct": 0.50,
+  "line_buffer_pixels": 25,
+  "enable_audio_alerts": true,
+  "alert_sound": true,
+  "debug_view": true
+}

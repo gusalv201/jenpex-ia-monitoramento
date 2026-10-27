@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JENPEX Vision - Monitor de Ocupação da Sala</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0a0f18;
+      --card-bg: rgba(18, 26, 43, 0.75);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00f0ff;
+      --accent-blue: #0070f3;
+      --color-success: #00e676;
+      --color-warning: #ffab00;
+      --color-danger: #ff1744;
+      --text-main: #f0f4f8;
+      --text-muted: #8a99ad;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 0%, #152238 0%, var(--bg-dark) 75%);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Cabeçalho */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 2.5rem;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(10, 15, 24, 0.8);
+      backdrop-filter: blur(12px);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, #00f0ff, #0070f3);
+      color: #000;
+      font-weight: 900;
+      font-size: 0.9rem;
+      padding: 0.4rem 0.8rem;
+      border-radius: 6px;
+      letter-spacing: 1px;
+    }
+
+    .brand-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 0.8rem;
+      align-items: center;
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: var(--accent-cyan);
+    }
+
+    /* Conteúdo Principal */
+    main {
+      flex: 1;
+      padding: 2rem 2.5rem;
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 2rem;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Card Principal de Ocupação */
+    .occupancy-hero {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 3rem 2.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(16px);
+      transition: all 0.4s ease;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.8rem 2rem;
+      border-radius: 50px;
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      transition: all 0.3s ease;
+    }
+
+    .status-badge.success {
+      background: rgba(0, 230, 118, 0.15);
+      border: 1px solid rgba(0, 230, 118, 0.4);
+      color: var(--color-success);
+      box-shadow: 0 0 30px rgba(0, 230, 118, 0.2);
+    }
+
+    .status-badge.warning {
+      background: rgba(255, 171, 0, 0.15);
+      border: 1px solid rgba(255, 171, 0, 0.4);
+      color: var(--color-warning);
+      box-shadow: 0 0 30px rgba(255, 171, 0, 0.2);
+    }
+
+    .status-badge.danger {
+      background: rgba(255, 23, 68, 0.2);
+      border: 1px solid rgba(255, 23, 68, 0.6);
+      color: var(--color-danger);
+      box-shadow: 0 0 40px rgba(255, 23, 68, 0.4);
+      animation: pulse-danger 1.5s infinite;
+    }
+
+    @keyframes pulse-danger {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    .pulse-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 10px currentColor;
+    }
+
+    .count-label {
+      font-size: 1.1rem;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .count-display {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .count-number {
+      font-size: 8rem;
+      font-weight: 900;
+      line-height: 1;
+      font-family: 'Outfit', sans-serif;
+      letter-spacing: -3px;
+      text-shadow: 0 0 40px rgba(255, 255, 255, 0.15);
+      transition: color 0.3s;
+    }
+
+    .count-limit {
+      font-size: 2.2rem;
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    /* Barra de Progresso / Lotação */
+    .capacity-bar-container {
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 1.5rem;
+    }
+
+    .capacity-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+      font-weight: 600;
+    }
+
+    .capacity-track {
+      width: 100%;
+      height: 16px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .capacity-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 12px;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1), background 0.4s ease;
+      background: var(--color-success);
+      box-shadow: 0 0 15px currentColor;
+    }
+
+    /* Painel Lateral Direito */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.2rem;
+    }
+
+    .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 1.5rem;
+      backdrop-filter: blur(12px);
+    }
+
+    .metric-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .metric-value {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Visualizador de Vídeo / IA */
+    .video-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .video-header {
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    .video-container {
+      position: relative;
+      width: 100%;
+      height: 240px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* Log de Eventos Recentes */
+    .events-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 1.2rem;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .events-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 0.8rem;
+    }
+
+    .event-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      padding: 0.4rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .event-in { color: var(--color-success); }
+    .event-out { color: var(--color-danger); }
+    .event-manual { color: var(--color-warning); }
+
+    /* Barra de Controles Rápidos do Estande */
+    .admin-bar {
+      margin-top: auto;
+      padding: 1rem 2.5rem;
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(10, 15, 24, 0.9);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .admin-buttons {
+      display: flex;
+      gap: 0.6rem;
+    }
+
+    .btn-sm {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 0.35rem 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-family: inherit;
+    }
+
+    .btn-sm:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    @media (max-width: 1024px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+      .count-number {
+        font-size: 6rem;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Topo do Totem -->
+  <header>
+    <div class="brand">
+      <div class="brand-badge">JENPEX</div>
+      <div>
+        <div class="brand-title" id="room-name">Sala de Exposição JENPEX</div>
+        <div class="brand-subtitle">Monitor de Ocupação em Tempo Real • Visão Computacional</div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-action" id="btn-sound" onclick="toggleSound()">
+        <span id="sound-icon">🔔</span> Som Ativo
+      </button>
+      <button class="btn-action" onclick="toggleFullScreen()">
+        ⛶ Tela Cheia (F11)
+      </button>
+    </div>
+  </header>
+
+  <!-- Corpo Principal -->
+  <main>
+    <!-- Card Principal de Contagem (O que o visitante na porta vê) -->
+    <div class="occupancy-hero" id="hero-card">
+      <div class="status-badge success" id="status-badge">
+        <div class="pulse-dot"></div>
+        <span id="status-text">ENTRADA PERMITIDA</span>
+      </div>
+
+      <div class="count-label">Pessoas Presentes na Sala</div>
+      <div class="count-display">
+        <span class="count-number" id="count-number">0</span>
+        <span class="count-limit" id="count-limit">/ 25 VAGAS</span>
+      </div>
+
+      <div class="capacity-bar-container">
+        <div class="capacity-labels">
+          <span>Lotação Atual</span>
+          <span id="pct-label">0%</span>
+        </div>
+        <div class="capacity-track">
+          <div class="capacity-fill" id="capacity-fill"></div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.95rem; color: var(--text-muted); font-weight: 500;" id="free-slots-text">
+        25 vagas disponíveis
+      </div>
+    </div>
+
+    <!-- Painel Lateral: Métricas, Câmera e Logs -->
+    <div class="side-panel">
+      <!-- Grid de Métricas -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-title">📥 Total Entradas</div>
+          <div class="metric-value" id="val-in" style="color: var(--color-success)">0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-title">📤 Total Saídas</div>
+          <div class="metric-value" id="val-out" style="color: #ff80ab">0</div>
+        </div>
+      </div>
+
+      <!-- Feed ao Vivo de IA -->
+      <div class="video-card">
+        <div class="video-header">
+          <span>📹 Visão da Câmera (Detecção & Linha)</span>
+          <span style="font-family: 'JetBrains Mono'; font-size: 0.8rem; color: var(--accent-cyan);" id="fps-label">FPS: --</span>
+        </div>
+        <div class="video-container">
+          <img src="/video_feed" alt="Transmissão ao vivo de IA" id="video-stream" onerror="this.src=''; this.alt='Câmera desconectada'">
+        </div>
+      </div>
+
+      <!-- Log de Passagens -->
+      <div class="events-card">
+        <div class="events-title">⏱️ Registro Recente de Fluxo</div>
+        <div id="events-list">
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Aguardando primeiras passagens...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Rodapé de Calibração / Controles Rápidos para os Alunos durante a Feira -->
+  <div class="admin-bar">
+    <div>
+      <span>Modelo: <strong id="model-label">YOLOv8</strong></span> • 
+      <span>Status: <strong style="color: var(--color-success)">Online</strong></span>
+    </div>
+    <div class="admin-buttons">
+      <span style="align-self: center; margin-right: 0.5rem;">Controles do Estande:</span>
+      <button class="btn-sm" onclick="adjustCount(-1)">-1 Pessoa</button>
+      <button class="btn-sm" onclick="adjustCount(1)">+1 Pessoa</button>
+      <button class="btn-sm" onclick="resetCount()" style="border-color: rgba(255,23,68,0.5)">Zerar Contagem</button>
+    </div>
+  </div>
+
+  <script>
+    let soundEnabled = true;
+    let lastCount = 0;
+    let audioCtx = null;
+
+    // Inicializa Web Audio API de forma sintetizada (sem precisar baixar MP3)
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    function playChime(freq1, freq2, duration) {
+      if (!soundEnabled) return;
+      try {
+        const ctx = getAudioContext();
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq1, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(freq2, ctx.currentTime + duration * 0.8);
+
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {
+        console.warn('Áudio bloqueado pelo navegador até interação', e);
+      }
+    }
+
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('btn-sound');
+      const icon = document.getElementById('sound-icon');
+      if (soundEnabled) {
+        btn.innerHTML = `<span id="sound-icon">🔔</span> Som Ativo`;
+        playChime(523, 659, 0.3); // Do - Mi
+      } else {
+        btn.innerHTML = `<span id="sound-icon">🔕</span> Mudo`;
+      }
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn(`Erro ao ativar tela cheia: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // Atualização em tempo real via Fetch polling (~600ms)
+    async function updateStatus() {
+      try {
+        const res = await fetch('/api/status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        // Detecta nova entrada para tocar som
+        if (data.current_count > lastCount) {
+          if (data.current_count >= data.room_capacity) {
+            playChime(880, 440, 0.6); // Alerta grave
+          } else {
+            playChime(440, 659, 0.35); // Chime de boas-vindas
+          }
+        }
+        lastCount = data.current_count;
+
+        // Atualiza textos
+        document.getElementById('room-name').textContent = data.room_name;
+        document.getElementById('count-number').textContent = data.current_count;
+        document.getElementById('count-limit').textContent = `/ ${data.room_capacity} VAGAS`;
+        document.getElementById('pct-label').textContent = `${data.occupancy_pct}%`;
+        document.getElementById('val-in').textContent = data.in_count;
+        document.getElementById('val-out').textContent = data.out_count;
+        document.getElementById('fps-label').textContent = `FPS: ${data.fps} • ${data.ai_model}`;
+        document.getElementById('model-label').textContent = data.ai_model;
+
+        const slots = Math.max(0, data.room_capacity - data.current_count);
+        document.getElementById('free-slots-text').textContent = 
+          slots === 0 ? "Nenhuma vaga restante!" : `${slots} vaga(s) disponível(is)`;
+
+        // Atualiza Badge de Status
+        const badge = document.getElementById('status-badge');
+        const statusText = document.getElementById('status-text');
+        badge.className = `status-badge ${data.status_color}`;
+        statusText.textContent = data.status_label;
+
+        // Atualiza barra de progresso
+        const fill = document.getElementById('capacity-fill');
+        fill.style.width = `${Math.min(100, data.occupancy_pct)}%`;
+        if (data.status_color === 'danger') {
+          fill.style.background = 'var(--color-danger)';
+        } else if (data.status_color === 'warning') {
+          fill.style.background = 'var(--color-warning)';
+        } else {
+          fill.style.background = 'var(--color-success)';
+        }
+
+        // Atualiza eventos recentes
+        const list = document.getElementById('events-list');
+        if (data.recent_events && data.recent_events.length > 0) {
+          list.innerHTML = data.recent_events.map(ev => {
+            let cls = 'event-manual';
+            if (ev.type.includes('ENTRADA')) cls = 'event-in';
+            if (ev.type.includes('SAIDA')) cls = 'event-out';
+            return `<div class="event-item">
+              <span class="${cls}">[${ev.type}] ${ev.message}</span>
+              <span style="color: var(--text-muted)">${ev.time}</span>
+            </div>`;
+          }).join('');
+        }
+      } catch (err) {
+        console.error("Erro ao buscar dados do servidor:", err);
+      }
+    }
+
+    async function adjustCount(delta) {
+      await fetch('/api/adjust', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ delta })
+      });
+      updateStatus();
+    }
+
+    async function resetCount() {
+      if (confirm('Tem certeza que deseja zerar a contagem de pessoas?')) {
+        await fetch('/api/reset', { method: 'POST' });
+        updateStatus();
+      }
+    }
+
+    // Inicializa ciclo
+    setInterval(updateStatus, 600);
+    updateStatus();
+  </script>
+</body>
+</html>

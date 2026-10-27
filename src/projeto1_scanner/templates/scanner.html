@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JENPEX - Scanner Inteligente de Objetos com IA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #070b12;
+      --card-bg: rgba(16, 24, 40, 0.85);
+      --card-border: rgba(0, 240, 255, 0.2);
+      --cyan: #00f0ff;
+      --green: #00e676;
+      --yellow: #ffd600;
+      --text: #f0f6fc;
+      --text-muted: #8b9bb4;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 10%, #102035 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.2rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(7, 11, 18, 0.9);
+      backdrop-filter: blur(10px);
+    }
+
+    .badge {
+      background: linear-gradient(135deg, var(--cyan), #0070f3);
+      color: #000;
+      padding: 0.35rem 0.8rem;
+      border-radius: 6px;
+      font-weight: 900;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+
+    .title { font-size: 1.4rem; font-weight: 800; }
+    .subtitle { font-size: 0.85rem; color: var(--text-muted); }
+
+    main {
+      flex: 1;
+      padding: 2rem 2.5rem;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 2rem;
+      max-width: 1500px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Card do Vídeo e Retículo */
+    .view-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 10px 40px rgba(0, 240, 255, 0.1);
+    }
+
+    .video-wrapper {
+      position: relative;
+      width: 100%;
+      height: 480px;
+      background: #000;
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Painel do Objeto Detectado */
+    .info-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .scanner-target-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+      text-align: center;
+      position: relative;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    }
+
+    .scanner-status {
+      display: inline-block;
+      font-size: 0.85rem;
+      letter-spacing: 2px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 0.4rem 1.2rem;
+      border-radius: 50px;
+      margin-bottom: 1.5rem;
+    }
+
+    .status-active {
+      background: rgba(0, 230, 118, 0.15);
+      border: 1px solid var(--green);
+      color: var(--green);
+    }
+
+    .status-waiting {
+      background: rgba(255, 214, 0, 0.15);
+      border: 1px solid var(--yellow);
+      color: var(--yellow);
+    }
+
+    .object-name {
+      font-size: 3.2rem;
+      font-weight: 900;
+      margin-bottom: 0.5rem;
+      letter-spacing: -1px;
+      line-height: 1.1;
+      text-shadow: 0 0 25px rgba(0, 240, 255, 0.3);
+    }
+
+    .object-category {
+      font-size: 1.1rem;
+      color: var(--cyan);
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .confidence-meter {
+      max-width: 320px;
+      margin: 0 auto 1.5rem auto;
+    }
+
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .meter-bar {
+      width: 100%;
+      height: 12px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      transition: width 0.3s;
+    }
+
+    /* Histórico de Itens */
+    .history-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 18px;
+      padding: 1.2rem;
+      flex: 1;
+      max-height: 250px;
+      overflow-y: auto;
+    }
+
+    .history-title {
+      font-size: 0.85rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.8rem;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+    }
+
+    .history-item span:first-child { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <div class="badge">PROJETO 1 • JENPEX</div>
+      <div>
+        <div class="title">Espelho Inteligente com IA • Scanner de Objetos</div>
+        <div class="subtitle">Câmera Frontal Interativa + Quadrado Imaginário Virtual (YOLOv8)</div>
+      </div>
+    </div>
+    <div style="font-family: 'JetBrains Mono'; font-size: 0.85rem; color: var(--cyan);" id="fps-tag">
+      FPS: --
+    </div>
+  </header>
+
+  <main>
+    <!-- Vídeo da Câmera com a Mira Virtual -->
+    <div class="view-card">
+      <div class="video-wrapper">
+        <img src="/video_feed" alt="Transmissão ao vivo do scanner">
+      </div>
+      <div style="margin-top: 0.8rem; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+        👋 <strong>Fique em frente à tela</strong> e segure o objeto dentro do <strong>quadrado imaginário flutuante</strong>.
+      </div>
+    </div>
+
+    <!-- Resultados da Identificação -->
+    <div class="info-panel">
+      <div class="scanner-target-card">
+        <div class="scanner-status status-waiting" id="scan-status">
+          SEGURE O OBJETO DENTRO DO QUADRADO VIRTUAL
+        </div>
+
+        <div class="object-name" id="object-name">---</div>
+        <div class="object-category" id="object-category">Insira um item para escanear</div>
+
+        <div class="confidence-meter">
+          <div class="meter-label">
+            <span>Grau de Certeza da IA</span>
+            <span id="meter-pct">0%</span>
+          </div>
+          <div class="meter-bar">
+            <div class="meter-fill" id="meter-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Histórico -->
+      <div class="history-card">
+        <div class="history-title">⏱️ Histórico Recente de Itens Escaneados</div>
+        <div id="history-list">
+          <div style="color: var(--text-muted); font-size: 0.85rem;">Nenhum item detectado ainda...</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let lastIdentified = "";
+    let audioCtx = null;
+
+    function playBeep() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.18);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.18);
+      } catch (e) {}
+    }
+
+    async function checkScanner() {
+      try {
+        const res = await fetch('/api/scanner_status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        document.getElementById('fps-tag').textContent = `FPS: ${data.fps} • IA YOLOv8n`;
+
+        const obj = data.current_object;
+        if (obj) {
+          if (obj.name_pt !== lastIdentified) {
+            playBeep();
+            lastIdentified = obj.name_pt;
+          }
+          document.getElementById('scan-status').className = "scanner-status status-active";
+          document.getElementById('scan-status').textContent = "OBJETO IDENTIFICADO COM SUCESSO!";
+          document.getElementById('object-name').textContent = obj.name_pt;
+          document.getElementById('object-category').textContent = `Categoria: ${obj.category}`;
+          document.getElementById('meter-pct').textContent = `${obj.confidence}%`;
+          document.getElementById('meter-fill').style.width = `${obj.confidence}%`;
+        } else {
+          lastIdentified = "";
+          document.getElementById('scan-status').className = "scanner-status status-waiting";
+          document.getElementById('scan-status').textContent = "AGUARDANDO OBJETO NO QUADRADO";
+          document.getElementById('object-name').textContent = "---";
+          document.getElementById('object-category').textContent = "Coloque um objeto dentro do quadrado imaginário";
+          document.getElementById('meter-pct').textContent = "0%";
+          document.getElementById('meter-fill').style.width = "0%";
+        }
+
+        if (data.history && data.history.length > 0) {
+          const list = document.getElementById('history-list');
+          list.innerHTML = data.history.map(item => `
+            <div class="history-item">
+              <span>${item.name_pt} (${item.confidence}%)</span>
+              <span style="color: var(--text-muted)">${item.time}</span>
+            </div>
+          `).join('');
+        }
+      } catch (err) {}
+    }
+
+    setInterval(checkScanner, 400);
+    checkScanner();
+  </script>
+</body>
+</html>

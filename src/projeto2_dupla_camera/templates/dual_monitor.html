@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JENPEX - Sistema de Dupla Câmera de Ocupação da Sala</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090e17;
+      --card: rgba(18, 27, 44, 0.8);
+      --border: rgba(255, 255, 255, 0.08);
+      --cyan: #00f0ff;
+      --green: #00e676;
+      --yellow: #ffab00;
+      --red: #ff1744;
+      --text: #f0f4f8;
+      --muted: #8899aa;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #15253d 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.2rem 2.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: rgba(9, 14, 23, 0.9);
+      backdrop-filter: blur(10px);
+    }
+
+    .badge {
+      background: linear-gradient(135deg, #00f0ff, #0070f3);
+      color: #000;
+      padding: 0.35rem 0.8rem;
+      border-radius: 6px;
+      font-weight: 900;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+    }
+
+    .title { font-size: 1.35rem; font-weight: 800; }
+    .subtitle { font-size: 0.85rem; color: var(--muted); }
+
+    main {
+      flex: 1;
+      padding: 1.8rem 2.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 2rem;
+      max-width: 1650px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    /* Placar Central de Lotação */
+    .occupancy-hero {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
+    }
+
+    .status-badge {
+      padding: 0.7rem 1.8rem;
+      border-radius: 50px;
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      margin-bottom: 1.5rem;
+    }
+
+    .status-badge.success {
+      background: rgba(0, 230, 118, 0.15);
+      border: 1px solid var(--green);
+      color: var(--green);
+      box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
+    }
+
+    .status-badge.danger {
+      background: rgba(255, 23, 68, 0.2);
+      border: 1px solid var(--red);
+      color: var(--red);
+      box-shadow: 0 0 35px rgba(255, 23, 68, 0.4);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+
+    .count-number {
+      font-size: 7.5rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+      margin-bottom: 0.5rem;
+    }
+
+    .count-limit {
+      font-size: 1.8rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+
+    /* Comparador de Câmeras */
+    .dual-audit-box {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1rem 1.5rem;
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-around;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .audit-stat {
+      text-align: center;
+    }
+
+    .audit-stat div:first-child {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 0.3rem;
+    }
+
+    .audit-stat div:last-child {
+      font-size: 1.6rem;
+      font-weight: 700;
+    }
+
+    /* Grid das Duas Câmeras */
+    .cameras-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .camera-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .camera-header {
+      padding: 0.8rem 1.2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .cam-feed {
+      width: 100%;
+      height: 240px;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cam-feed img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <div class="badge">PROJETO 2 • JENPEX</div>
+      <div>
+        <div class="title">Sistema de Dupla Câmera de Ocupação da Sala</div>
+        <div class="subtitle">Visão Panorâmica Interna + Linha de Fluxo na Porta • Auditoria em Tempo Real</div>
+      </div>
+    </div>
+    <button onclick="document.documentElement.requestFullscreen()" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem;">
+      ⛶ Tela Cheia (F11)
+    </button>
+  </header>
+
+  <main>
+    <!-- Placar Central de Lotação -->
+    <div class="occupancy-hero">
+      <div class="status-badge success" id="status-badge">
+        ENTRADA PERMITIDA
+      </div>
+
+      <div style="font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); font-weight: 700;">
+        Pessoas na Sala (Lotação Auditada)
+      </div>
+
+      <div class="count-number" id="count-number">0</div>
+      <div class="count-limit" id="count-limit">/ 30 VAGAS MÁXIMAS</div>
+
+      <!-- Caixa Comparativa de Auditoria -->
+      <div class="dual-audit-box">
+        <div class="audit-stat">
+          <div>CAM 1: SALÃO</div>
+          <div style="color: var(--cyan)" id="val-panoramic">0</div>
+        </div>
+        <div style="border-left: 1px solid var(--border);"></div>
+        <div class="audit-stat">
+          <div>CAM 2: PORTA</div>
+          <div style="color: var(--green)" id="val-gate">0</div>
+        </div>
+        <div style="border-left: 1px solid var(--border);"></div>
+        <div class="audit-stat">
+          <div>DIVERGÊNCIA</div>
+          <div style="color: var(--yellow)" id="val-diff">0</div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.85rem; color: var(--muted);" id="audit-msg">
+        Auditoria: Validação Sincronizada entre Câmeras
+      </div>
+    </div>
+
+    <!-- Visão das Duas Câmeras -->
+    <div class="cameras-container">
+      <!-- Câmera 1: Panorâmica -->
+      <div class="camera-card">
+        <div class="camera-header">
+          <span style="color: var(--cyan);">📹 CÂMERA 1: VISÃO PANORÂMICA (INTERNA DO SALÃO)</span>
+          <span id="cam1-stat">Pessoas detectadas: 0</span>
+        </div>
+        <div class="cam-feed">
+          <img src="/cam1_feed" alt="Câmera 1 Panorâmica">
+        </div>
+      </div>
+
+      <!-- Câmera 2: Porta -->
+      <div class="camera-card">
+        <div class="camera-header">
+          <span style="color: var(--green);">🚪 CÂMERA 2: LINHA VIRTUAL DE FLUXO (HALL DE ENTRADA)</span>
+          <span id="cam2-stat">IN: 0 | OUT: 0</span>
+        </div>
+        <div class="cam-feed">
+          <img src="/cam2_feed" alt="Câmera 2 Portaria">
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    async function updateDualStatus() {
+      try {
+        const res = await fetch('/api/dual_status');
+        if (!res.ok) return;
+        const d = await res.json();
+
+        document.getElementById('count-number').textContent = d.audited_occupancy;
+        document.getElementById('count-limit').textContent = `/ ${d.room_capacity} VAGAS MÁXIMAS`;
+
+        document.getElementById('val-panoramic').textContent = d.count_panoramic;
+        document.getElementById('val-gate').textContent = d.count_gate;
+        document.getElementById('val-diff').textContent = d.discrepancy;
+
+        document.getElementById('cam1-stat').textContent = `Pessoas detectadas: ${d.count_panoramic}`;
+        document.getElementById('cam2-stat').textContent = `IN: ${d.in_count} | OUT: ${d.out_count}`;
+
+        const badge = document.getElementById('status-badge');
+        badge.className = `status-badge ${d.status_color}`;
+        badge.textContent = d.status_label;
+
+        document.getElementById('audit-msg').textContent = `Auditoria: ${d.audit_status}`;
+      } catch (e) {}
+    }
+
+    setInterval(updateDualStatus, 600);
+    updateDualStatus();
+  </script>
+</body>
+</html>
