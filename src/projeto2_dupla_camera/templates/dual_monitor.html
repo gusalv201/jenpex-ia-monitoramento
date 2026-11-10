@@ -3,298 +3,847 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JENPEX - Sistema de Dupla Câmera de Ocupação da Sala</title>
+  <title>JENPEX - Monitor de Ocupação da Sala (Visão Panorâmica)</title>
+  
+  <!-- Fontes Google -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  
   <style>
     :root {
-      --bg: #090e17;
-      --card: rgba(18, 27, 44, 0.8);
-      --border: rgba(255, 255, 255, 0.08);
+      --bg: #070b12;
+      --card-bg: rgba(15, 23, 38, 0.85);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --card-border-glow: rgba(0, 240, 255, 0.25);
       --cyan: #00f0ff;
+      --cyan-glow: rgba(0, 240, 255, 0.35);
       --green: #00e676;
-      --yellow: #ffab00;
+      --green-glow: rgba(0, 230, 118, 0.35);
+      --gold: #ffb703;
+      --gold-glow: rgba(255, 183, 3, 0.4);
       --red: #ff1744;
+      --red-glow: rgba(255, 23, 68, 0.45);
       --text: #f0f4f8;
-      --muted: #8899aa;
+      --text-muted: #8da2b5;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
-      background: radial-gradient(circle at 50% 0%, #15253d 0%, var(--bg) 80%);
+      background: radial-gradient(circle at 50% 0%, #132238 0%, var(--bg) 85%);
       color: var(--text);
       font-family: 'Outfit', sans-serif;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+      overflow-x: hidden;
     }
 
+    /* Cabeçalho Tecnológico */
     header {
-      padding: 1.2rem 2.5rem;
+      padding: 1rem 2rem;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      border-bottom: 1px solid var(--border);
-      background: rgba(9, 14, 23, 0.9);
-      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(7, 11, 18, 0.85);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
-    .badge {
-      background: linear-gradient(135deg, #00f0ff, #0070f3);
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 1.2rem;
+    }
+
+    .brand-badge {
+      background: linear-gradient(135deg, var(--cyan), #0070f3);
       color: #000;
-      padding: 0.35rem 0.8rem;
-      border-radius: 6px;
+      padding: 0.4rem 0.9rem;
+      border-radius: 8px;
       font-weight: 900;
       font-size: 0.85rem;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
+      box-shadow: 0 0 15px var(--cyan-glow);
     }
 
-    .title { font-size: 1.35rem; font-weight: 800; }
-    .subtitle { font-size: 0.85rem; color: var(--muted); }
+    .brand-text h1 {
+      font-size: 1.35rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
 
+    .brand-text p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .live-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(255, 23, 68, 0.15);
+      border: 1px solid rgba(255, 23, 68, 0.3);
+      padding: 0.35rem 0.8rem;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #ff5252;
+    }
+
+    .live-dot {
+      width: 9px;
+      height: 9px;
+      background: var(--red);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--red);
+      animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.3; transform: scale(0.85); }
+    }
+
+    .btn-header {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 0.5rem 1.1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-header:hover {
+      background: rgba(0, 240, 255, 0.15);
+      border-color: var(--cyan);
+      box-shadow: 0 0 15px var(--cyan-glow);
+    }
+
+    /* Container Principal */
     main {
       flex: 1;
-      padding: 1.8rem 2.5rem;
+      padding: 1.5rem 2rem;
       display: grid;
-      grid-template-columns: 1fr 1.3fr;
-      gap: 2rem;
-      max-width: 1650px;
+      grid-template-columns: minmax(0, 1.75fr) minmax(380px, 1fr);
+      gap: 1.8rem;
+      max-width: 1750px;
       margin: 0 auto;
       width: 100%;
     }
 
-    /* Placar Central de Lotação */
-    .occupancy-hero {
-      background: var(--card);
-      border: 1px solid var(--border);
+    @media (max-width: 1100px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Painel Esquerdo: Tela Panorâmica em Maior Escala */
+    .video-viewport-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
       border-radius: 24px;
-      padding: 2.5rem 2rem;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      position: relative;
+    }
+
+    .viewport-header {
+      padding: 1rem 1.5rem;
+      background: rgba(12, 19, 32, 0.9);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .viewport-title {
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--cyan);
+      letter-spacing: 0.5px;
+    }
+
+    .viewport-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: rgba(0, 0, 0, 0.4);
+      padding: 0.3rem 0.7rem;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+    }
+
+    .video-screen {
+      position: relative;
+      width: 100%;
+      background: #000;
+      min-height: 480px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-screen img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      border-radius: 0 0 20px 20px;
+    }
+
+    .viewport-footer {
+      padding: 0.9rem 1.5rem;
+      background: rgba(10, 16, 26, 0.7);
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Coluna Direita: Ocupação Ao Vivo e Recorde de Pessoas */
+    .sidebar-metrics {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 22px;
+      padding: 1.5rem;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* CARD 1: Ocupação Ao Vivo */
+    .live-card {
+      border-top: 4px solid var(--cyan);
+      text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      text-align: center;
-      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
     }
 
-    .status-badge {
-      padding: 0.7rem 1.8rem;
+    .card-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--text-muted);
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .live-counter {
+      font-size: 6rem;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -2px;
+      color: #fff;
+      margin: 0.2rem 0;
+      text-shadow: 0 0 30px var(--cyan-glow);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .capacity-label {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 1.2rem;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 0.6rem 1.8rem;
       border-radius: 50px;
-      font-size: 1.2rem;
+      font-size: 1rem;
       font-weight: 800;
       letter-spacing: 1px;
-      margin-bottom: 1.5rem;
+      text-transform: uppercase;
+      margin-bottom: 1.2rem;
+      transition: all 0.3s ease;
     }
 
-    .status-badge.success {
+    .status-pill.success {
       background: rgba(0, 230, 118, 0.15);
       border: 1px solid var(--green);
       color: var(--green);
-      box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
+      box-shadow: 0 0 20px var(--green-glow);
     }
 
-    .status-badge.danger {
+    .status-pill.warning {
+      background: rgba(255, 183, 3, 0.15);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      box-shadow: 0 0 20px var(--gold-glow);
+    }
+
+    .status-pill.danger {
       background: rgba(255, 23, 68, 0.2);
       border: 1px solid var(--red);
       color: var(--red);
-      box-shadow: 0 0 35px rgba(255, 23, 68, 0.4);
-      animation: pulse 1.5s infinite;
+      box-shadow: 0 0 25px var(--red-glow);
+      animation: pulse 1.2s infinite;
     }
 
     @keyframes pulse {
       0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.03); }
+      50% { transform: scale(1.04); }
     }
 
-    .count-number {
-      font-size: 7.5rem;
-      font-weight: 900;
-      line-height: 1;
-      letter-spacing: -2px;
-      margin-bottom: 0.5rem;
-    }
-
-    .count-limit {
-      font-size: 1.8rem;
-      color: var(--muted);
-      margin-bottom: 1.5rem;
-    }
-
-    /* Comparador de Câmeras */
-    .dual-audit-box {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1rem 1.5rem;
+    /* Barra de progresso da capacidade */
+    .capacity-bar-track {
       width: 100%;
-      max-width: 420px;
-      margin-bottom: 1.5rem;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      overflow: hidden;
+      margin-top: 0.4rem;
+    }
+
+    .capacity-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+      border-radius: 20px;
+      width: 0%;
+      transition: width 0.4s ease, background 0.4s ease;
+    }
+
+    /* CARD 2: Momento Recorde de Pessoas */
+    .record-card {
+      border-top: 4px solid var(--gold);
+      background: linear-gradient(180deg, rgba(30, 25, 15, 0.7) 0%, var(--card-bg) 100%);
+    }
+
+    .record-header {
       display: flex;
-      justify-content: space-around;
-      font-family: 'JetBrains Mono', monospace;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
     }
 
-    .audit-stat {
-      text-align: center;
-    }
-
-    .audit-stat div:first-child {
+    .record-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(255, 183, 3, 0.15);
+      border: 1px solid rgba(255, 183, 3, 0.4);
+      color: var(--gold);
+      padding: 0.35rem 0.8rem;
+      border-radius: 30px;
       font-size: 0.75rem;
-      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .record-stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 1rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      padding: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-box-title {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       margin-bottom: 0.3rem;
     }
 
-    .audit-stat div:last-child {
-      font-size: 1.6rem;
-      font-weight: 700;
+    .stat-box-val {
+      font-size: 1.9rem;
+      font-weight: 900;
+      color: var(--gold);
+      line-height: 1.1;
+      font-family: 'JetBrains Mono', monospace;
     }
 
-    /* Grid das Duas Câmeras */
-    .cameras-container {
-      display: flex;
-      flex-direction: column;
-      gap: 1.2rem;
-    }
-
-    .camera-card {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .camera-header {
-      padding: 0.8rem 1.2rem;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
+    .stat-box-date {
       font-size: 0.85rem;
-      font-weight: 700;
+      font-weight: 600;
+      color: #fff;
+      margin-top: 0.4rem;
+      line-height: 1.3;
+      font-family: 'JetBrains Mono', monospace;
     }
 
-    .cam-feed {
-      width: 100%;
-      height: 240px;
+    /* Visualizador da Fotografia do Recorde */
+    .record-photo-wrapper {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 183, 3, 0.3);
       background: #000;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      aspect-ratio: 4 / 3;
       display: flex;
       align-items: center;
       justify-content: center;
+      cursor: pointer;
+      transition: transform 0.2s ease, border-color 0.2s ease;
     }
 
-    .cam-feed img {
+    .record-photo-wrapper:hover {
+      transform: scale(1.02);
+      border-color: var(--gold);
+    }
+
+    .record-photo-wrapper img {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      display: block;
+    }
+
+    .photo-overlay-tag {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.75);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      backdrop-filter: blur(5px);
+      letter-spacing: 0.5px;
+    }
+
+    .photo-zoom-hint {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.75);
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      pointer-events: none;
+    }
+
+    .record-actions {
+      display: flex;
+      gap: 0.8rem;
+      margin-top: 1rem;
+    }
+
+    .btn-action {
+      flex: 1;
+      padding: 0.65rem 1rem;
+      border-radius: 10px;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .btn-action:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .btn-reset {
+      color: #ff8a80;
+    }
+    .btn-reset:hover {
+      background: rgba(255, 23, 68, 0.15);
+      border-color: var(--red);
+    }
+
+    /* CARD 3: Histórico Recente */
+    .log-card {
+      padding: 1.2rem 1.5rem;
+    }
+
+    .log-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 130px;
+      overflow-y: auto;
+    }
+
+    .log-item {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--text-muted);
+      padding: 0.25rem 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .log-item.record {
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    .log-time {
+      color: var(--cyan);
+      font-size: 0.72rem;
+    }
+
+    /* Modal de Zoom da Foto */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(10px);
+      z-index: 999;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-content {
+      max-width: 900px;
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--gold);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 0 50px var(--gold-glow);
+    }
+
+    .modal-header {
+      padding: 1rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .modal-body img {
+      width: 100%;
+      height: auto;
+      display: block;
     }
   </style>
 </head>
 <body>
+
+  <!-- Topo do Sistema -->
   <header>
-    <div style="display: flex; align-items: center; gap: 1rem;">
-      <div class="badge">PROJETO 2 • JENPEX</div>
-      <div>
-        <div class="title">Sistema de Dupla Câmera de Ocupação da Sala</div>
-        <div class="subtitle">Visão Panorâmica Interna + Linha de Fluxo na Porta • Auditoria em Tempo Real</div>
+    <div class="brand-group">
+      <div class="brand-badge">IFMT • JENPEX 2026</div>
+      <div class="brand-text">
+        <h1>Monitor de Ocupação da Sala (Visão Panorâmica)</h1>
+        <p>Grupo 2 • Visão Computacional com IA (YOLOv8) e Auditoria de Recorde em Tempo Real</p>
       </div>
     </div>
-    <button onclick="document.documentElement.requestFullscreen()" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem;">
-      ⛶ Tela Cheia (F11)
-    </button>
+
+    <div class="header-actions">
+      <div class="live-indicator">
+        <div class="live-dot"></div>
+        <span>AO VIVO</span>
+      </div>
+      <button class="btn-header" onclick="toggleFullscreen()">
+        ⛶ Tela Cheia (F11)
+      </button>
+    </div>
   </header>
 
+  <!-- Corpo Principal -->
   <main>
-    <!-- Placar Central de Lotação -->
-    <div class="occupancy-hero">
-      <div class="status-badge success" id="status-badge">
-        ENTRADA PERMITIDA
-      </div>
-
-      <div style="font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); font-weight: 700;">
-        Pessoas na Sala (Lotação Auditada)
-      </div>
-
-      <div class="count-number" id="count-number">0</div>
-      <div class="count-limit" id="count-limit">/ 30 VAGAS MÁXIMAS</div>
-
-      <!-- Caixa Comparativa de Auditoria -->
-      <div class="dual-audit-box">
-        <div class="audit-stat">
-          <div>CAM 1: SALÃO</div>
-          <div style="color: var(--cyan)" id="val-panoramic">0</div>
+    <!-- LADO ESQUERDO: Tela da Câmera Panorâmica em Maior Escala -->
+    <div class="video-viewport-card">
+      <div class="viewport-header">
+        <div class="viewport-title">
+          <span>📹</span>
+          <span>TRANSMISSÃO AO VIVO • CÂMERA PANORÂMICA DO SALÃO</span>
         </div>
-        <div style="border-left: 1px solid var(--border);"></div>
-        <div class="audit-stat">
-          <div>CAM 2: PORTA</div>
-          <div style="color: var(--green)" id="val-gate">0</div>
-        </div>
-        <div style="border-left: 1px solid var(--border);"></div>
-        <div class="audit-stat">
-          <div>DIVERGÊNCIA</div>
-          <div style="color: var(--yellow)" id="val-diff">0</div>
+        <div class="viewport-meta" id="fps-stat">
+          FPS: 30.0 • YOLOv8
         </div>
       </div>
 
-      <div style="font-size: 0.85rem; color: var(--muted);" id="audit-msg">
-        Auditoria: Validação Sincronizada entre Câmeras
+      <div class="video-screen">
+        <img id="video-stream" src="/cam1_feed" alt="Transmissão Panorâmica em Tempo Real">
+      </div>
+
+      <div class="viewport-footer">
+        <div>Área de monitoramento total: auditório / salão de eventos</div>
+        <div style="color: var(--cyan); font-weight: 600;">Status da IA: Operando</div>
       </div>
     </div>
 
-    <!-- Visão das Duas Câmeras -->
-    <div class="cameras-container">
-      <!-- Câmera 1: Panorâmica -->
-      <div class="camera-card">
-        <div class="camera-header">
-          <span style="color: var(--cyan);">📹 CÂMERA 1: VISÃO PANORÂMICA (INTERNA DO SALÃO)</span>
-          <span id="cam1-stat">Pessoas detectadas: 0</span>
+    <!-- LADO DIREITO: Ocupação Ao Vivo e Momento Recorde -->
+    <div class="sidebar-metrics">
+
+      <!-- CARD 1: Pessoas Presentes Ao Vivo -->
+      <div class="card live-card">
+        <div class="card-label">
+          <span>👥</span>
+          <span>Pessoas Presentes no Salão</span>
         </div>
-        <div class="cam-feed">
-          <img src="/cam1_feed" alt="Câmera 1 Panorâmica">
+
+        <div class="live-counter" id="live-count">0</div>
+        <div class="capacity-label" id="capacity-label">/ 25 VAGAS MÁXIMAS</div>
+
+        <div class="status-pill success" id="status-pill">
+          ENTRADA PERMITIDA
+        </div>
+
+        <!-- Barra de Progresso da Lotação -->
+        <div style="width: 100%; text-align: left; font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between;">
+          <span>Taxa de Ocupação</span>
+          <span id="pct-label">0%</span>
+        </div>
+        <div class="capacity-bar-track">
+          <div class="capacity-bar-fill" id="capacity-fill"></div>
         </div>
       </div>
 
-      <!-- Câmera 2: Porta -->
-      <div class="camera-card">
-        <div class="camera-header">
-          <span style="color: var(--green);">🚪 CÂMERA 2: LINHA VIRTUAL DE FLUXO (HALL DE ENTRADA)</span>
-          <span id="cam2-stat">IN: 0 | OUT: 0</span>
+      <!-- CARD 2: Momento Recorde de Pessoas (Pico Histórico) -->
+      <div class="card record-card">
+        <div class="record-header">
+          <div class="card-label" style="color: var(--gold); margin: 0;">
+            <span>🏆</span>
+            <span>Recorde Histórico de Ocupação</span>
+          </div>
+          <div class="record-badge">PICO MÁXIMO</div>
         </div>
-        <div class="cam-feed">
-          <img src="/cam2_feed" alt="Câmera 2 Portaria">
+
+        <!-- Grade de Estatísticas do Recorde -->
+        <div class="record-stats-grid">
+          <div class="stat-box">
+            <span class="stat-box-title">Pessoas no Pico</span>
+            <span class="stat-box-val" id="peak-count">0</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-box-title">Data e Horário</span>
+            <span class="stat-box-date" id="peak-timestamp">Aguardando...</span>
+          </div>
+        </div>
+
+        <!-- Fotografia Oficial do Momento Recorde -->
+        <div class="record-photo-wrapper" onclick="openPhotoModal()" title="Clique para ampliar a fotografia">
+          <img id="record-snapshot-img" src="/api/record_snapshot" alt="Fotografia do Momento Recorde">
+          <div class="photo-overlay-tag">📸 FOTO OFICIAL DO PICO</div>
+          <div class="photo-zoom-hint">🔍 Clique para expandir</div>
+        </div>
+
+        <!-- Botões de Ação do Recorde -->
+        <div class="record-actions">
+          <button class="btn-action" onclick="openPhotoModal()">
+            <span>🔍</span>
+            <span>Ver Ampliada</span>
+          </button>
+          <button class="btn-action btn-reset" onclick="resetRecord()">
+            <span>↺</span>
+            <span>Zerar Recorde</span>
+          </button>
         </div>
       </div>
+
+      <!-- CARD 3: Histórico de Eventos -->
+      <div class="card log-card">
+        <div class="card-label">
+          <span>⏱️</span>
+          <span>Log de Eventos & Auditoria</span>
+        </div>
+        <ul class="log-list" id="events-list">
+          <li class="log-item">
+            <span class="log-time">--:--:--</span>
+            <span>Iniciando monitoramento da sala...</span>
+          </li>
+        </ul>
+      </div>
+
     </div>
   </main>
 
+  <!-- Modal para visualização ampliada da foto do recorde -->
+  <div class="modal-backdrop" id="photo-modal" onclick="closePhotoModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="font-weight: 800; color: var(--gold); display: flex; align-items: center; gap: 0.5rem;">
+          <span>🏆</span>
+          <span id="modal-title">Fotografia Oficial do Recorde de Pessoas</span>
+        </div>
+        <button class="btn-header" onclick="closePhotoModal()">✕ Fechar</button>
+      </div>
+      <div class="modal-body">
+        <img id="modal-img" src="/api/record_snapshot" alt="Fotografia Ampliada do Recorde">
+      </div>
+    </div>
+  </div>
+
   <script>
-    async function updateDualStatus() {
+    let lastPeakCount = 0;
+
+    // Atualiza os dados via API a cada 500ms
+    async function fetchSystemStatus() {
       try {
-        const res = await fetch('/api/dual_status');
-        if (!res.ok) return;
-        const d = await res.json();
+        const response = await fetch('/api/dual_status');
+        if (!response.ok) return;
+        const data = await response.json();
 
-        document.getElementById('count-number').textContent = d.audited_occupancy;
-        document.getElementById('count-limit').textContent = `/ ${d.room_capacity} VAGAS MÁXIMAS`;
+        // 1. Atualiza Ocupação Ao Vivo
+        const currentCount = data.count_panoramic || 0;
+        document.getElementById('live-count').textContent = currentCount;
+        document.getElementById('capacity-label').textContent = `/ ${data.room_capacity} VAGAS MÁXIMAS`;
 
-        document.getElementById('val-panoramic').textContent = d.count_panoramic;
-        document.getElementById('val-gate').textContent = d.count_gate;
-        document.getElementById('val-diff').textContent = d.discrepancy;
+        // Status Pill
+        const pill = document.getElementById('status-pill');
+        pill.className = `status-pill ${data.status_color}`;
+        pill.textContent = data.status_label;
 
-        document.getElementById('cam1-stat').textContent = `Pessoas detectadas: ${d.count_panoramic}`;
-        document.getElementById('cam2-stat').textContent = `IN: ${d.in_count} | OUT: ${d.out_count}`;
+        // Barra de progresso
+        const pct = data.occupancy_pct || 0;
+        document.getElementById('pct-label').textContent = `${pct}%`;
+        const fill = document.getElementById('capacity-fill');
+        fill.style.width = `${pct}%`;
+        if (pct >= 100) {
+          fill.style.background = 'var(--red)';
+        } else if (pct >= 80) {
+          fill.style.background = 'var(--gold)';
+        } else {
+          fill.style.background = 'linear-gradient(90deg, var(--cyan), var(--green))';
+        }
 
-        const badge = document.getElementById('status-badge');
-        badge.className = `status-badge ${d.status_color}`;
-        badge.textContent = d.status_label;
+        // FPS
+        document.getElementById('fps-stat').textContent = `FPS: ${(data.fps || 0).toFixed(1)} • YOLOv8`;
 
-        document.getElementById('audit-msg').textContent = `Auditoria: ${d.audit_status}`;
-      } catch (e) {}
+        // 2. Atualiza Momento Recorde (Pico Histórico)
+        if (data.peak_record) {
+          const peak = data.peak_record;
+          document.getElementById('peak-count').textContent = peak.count;
+          document.getElementById('peak-timestamp').textContent = peak.timestamp;
+
+          // Se houve um novo recorde, atualiza a imagem com timestamp para evitar cache
+          if (peak.count > lastPeakCount && peak.has_record) {
+            lastPeakCount = peak.count;
+            const cacheBuster = `?t=${Date.now()}`;
+            document.getElementById('record-snapshot-img').src = `/api/record_snapshot${cacheBuster}`;
+            document.getElementById('modal-img').src = `/api/record_snapshot${cacheBuster}`;
+            document.getElementById('modal-title').textContent = `Recorde Oficial: ${peak.count} Pessoas (${peak.timestamp})`;
+          } else if (peak.count === 0) {
+            lastPeakCount = 0;
+            document.getElementById('record-snapshot-img').src = `/api/record_snapshot?t=${Date.now()}`;
+          }
+        }
+
+        // 3. Atualiza Log de Eventos
+        if (data.events && data.events.length > 0) {
+          const listEl = document.getElementById('events-list');
+          listEl.innerHTML = data.events.map(ev => `
+            <li class="log-item ${ev.type === 'record' ? 'record' : ''}">
+              <span class="log-time">[${ev.time}]</span>
+              <span>${ev.text}</span>
+            </li>
+          `).join('');
+        }
+
+      } catch (err) {
+        console.warn("Erro ao buscar status:", err);
+      }
     }
 
-    setInterval(updateDualStatus, 600);
-    updateDualStatus();
+    // Função para zerar o recorde
+    async function resetRecord() {
+      if (!confirm("Deseja realmente zerar o recorde histórico atual?")) return;
+      try {
+        await fetch('/api/reset_record', { method: 'POST' });
+        lastPeakCount = 0;
+        fetchSystemStatus();
+      } catch (e) {
+        alert("Erro ao zerar recorde.");
+      }
+    }
+
+    // Modal de Zoom da Foto
+    function openPhotoModal() {
+      const modal = document.getElementById('photo-modal');
+      const modalImg = document.getElementById('modal-img');
+      modalImg.src = `/api/record_snapshot?t=${Date.now()}`;
+      modal.classList.add('active');
+    }
+
+    function closePhotoModal() {
+      document.getElementById('photo-modal').classList.remove('active');
+    }
+
+    // Alternar Tela Cheia
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn(`Erro ao ativar tela cheia: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // Atalho de teclado para F11 e ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closePhotoModal();
+    });
+
+    // Inicia atualização periódica
+    setInterval(fetchSystemStatus, 500);
+    fetchSystemStatus();
   </script>
 </body>
 </html>

@@ -16,3 +16,6 @@ env/
 # Sistema Operacional
 Thumbs.db
 Desktop.ini
+
+# Snapshots em tempo real
+src/projeto2_dupla_camera/static/*.jpg
