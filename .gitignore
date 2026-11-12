@@ -17,5 +17,6 @@ env/
 Thumbs.db
 Desktop.ini
 
-# Snapshots em tempo real
+# Snapshots e dados em tempo real
 src/projeto2_dupla_camera/static/*.jpg
+src/projeto2_dupla_camera/static/*.json

@@ -42,13 +42,22 @@ iniciar_projeto1_scanner.bat
 
 ---
 
-### 🚪 Rodar Projeto 2 (Dupla Câmera de Ocupação da Sala):
+### 🚪 Rodar Projeto 2 (Grupo 2 - Monitor de Ocupação com Câmera Panorâmica):
 Dê um duplo clique em:
+```bat
+iniciar.bat
 ```
-iniciar_projeto2_cameras.bat
-```
+*(ou `iniciar_projeto2_cameras.bat`)*
 - **Porta:** `http://localhost:5002`
-- **O que faz:** Abre o painel do monitor da porta da sala. Exibe simultaneamente a Câmera Panorâmica (contando quem está no salão) e a Câmera da Porta (linha virtual de fluxo IN/OUT), auditando a lotação e alertando os visitantes se a sala estiver cheia.
+- **Código-fonte:** `src/projeto2_dupla_camera/dual_camera_app.py`
+- **O que faz:**
+  - **Área Esquerda (Câmera Panorâmica Única):** Transmissão em tempo real da sala com detecção YOLOv8n, caixas neon com rótulos numerados ("Pessoa 1, 2, 3..."), indicador "AO VIVO" e taxa de FPS.
+  - **Área Direita (Painel de Métricas):**
+    - **Ocupação Neste Momento:** Contador em tempo real com indicador de status (Normal / Próximo da Lotação / Lotação Máxima).
+    - **Recorde de Lotação (Troféu):** Maior número de pessoas já registrado, fotografia oficial do momento do recorde com marca d'água, data e horário do pico.
+    - **Persistência em Disco:** O recorde e a fotografia persistem em `record_data.json` e `record_snapshot.jpg` mesmo após reiniciar o servidor.
+    - **Estabilização da Contagem:** Mediana dos últimos 5 frames para evitar oscilações falsas.
+    - **Botão Zerar Recorde:** Possibilita reiniciar a medição com confirmação.
 
 ---
 
