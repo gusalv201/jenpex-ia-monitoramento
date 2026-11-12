@@ -16,3 +16,12 @@ env/
 # Sistema Operacional
 Thumbs.db
 Desktop.ini
+
+# Pesos baixados do YOLO, capturas e bancos locais
+*.pt
+!yolov8n.pt
+capturas/
+resultados/
+weights/
+*.db
+*.sqlite3
