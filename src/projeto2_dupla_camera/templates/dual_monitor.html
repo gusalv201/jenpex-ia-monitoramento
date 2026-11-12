@@ -485,17 +485,30 @@
   <script>
     const video = document.getElementById("video-stream");
     const offlineMessage = document.getElementById("camera-offline");
+    let isVideoConnected = false;
+    let lastRecordVersion = "";
+    let reconnectTimer = null;
 
     video.addEventListener("load", () => {
       video.style.display = "block";
       offlineMessage.style.display = "none";
+      isVideoConnected = true;
       document.getElementById("camera-status").textContent = "CÂMERA ONLINE";
     });
 
     video.addEventListener("error", () => {
       video.style.display = "none";
       offlineMessage.style.display = "grid";
-      document.getElementById("camera-status").textContent = "CÂMERA OFFLINE";
+      isVideoConnected = false;
+      document.getElementById("camera-status").textContent = "RECONECTANDO...";
+      
+      // Auto-reconexão instantânea do stream de vídeo caso oscile
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          video.src = `/video_feed?t=${Date.now()}`;
+        }, 1500);
+      }
     });
 
     async function resetRecord() {
@@ -503,6 +516,7 @@
       try {
         const resp = await fetch("/api/reset_record", { method: "POST" });
         if (resp.ok) {
+          lastRecordVersion = "";
           updateDashboard();
         }
       } catch (err) {
@@ -518,15 +532,21 @@
       }
     }
 
-    function setRecordPhoto(photoUrl) {
+    function setRecordPhoto(photoUrl, recordTime, recordCount) {
       const photo = document.getElementById("record-photo");
       const placeholder = document.getElementById("record-placeholder");
 
-      if (photoUrl) {
-        photo.src = photoUrl;
+      if (photoUrl && recordCount > 0) {
+        const versionKey = `${recordCount}_${recordTime}`;
+        // Se bateu um novo recorde, força o navegador a atualizar a imagem imediatamente
+        if (versionKey !== lastRecordVersion) {
+          lastRecordVersion = versionKey;
+          photo.src = `${photoUrl}?v=${Date.now()}`;
+        }
         photo.hidden = false;
         placeholder.hidden = true;
       } else {
+        lastRecordVersion = "";
         photo.removeAttribute("src");
         photo.hidden = true;
         placeholder.hidden = false;
@@ -543,19 +563,19 @@
         document.getElementById("current-count").textContent =
           Number(data.current_count ?? 0);
 
-        document.getElementById("record-count").textContent =
-          Number(data.record_count ?? data.peak_count ?? 0);
+        const recCount = Number(data.record_count ?? data.peak_count ?? 0);
+        document.getElementById("record-count").textContent = recCount;
 
         document.getElementById("fps-label").textContent =
           `FPS: ${data.fps ?? "--"}`;
 
         document.getElementById("model-label").textContent =
-          data.ai_model ?? "YOLO";
+          data.ai_model ?? "YOLOv8";
 
         const status = document.getElementById("occupancy-status");
         const statusLabel = document.getElementById("status-label");
         const current = Number(data.current_count ?? 0);
-        const capacity = Number(data.room_capacity ?? 0);
+        const capacity = Number(data.room_capacity ?? 100);
 
         status.className = "occupancy-status";
         if (capacity > 0 && current >= capacity) {
@@ -568,10 +588,10 @@
           statusLabel.textContent = "MONITORAMENTO NORMAL";
         }
 
-        // O backend deve enviar esses campos quando houver um recorde:
-        // record_photo (URL/caminho acessível pelo navegador),
-        // record_date (DD/MM/AAAA) e record_time (HH:MM:SS).
-        setRecordPhoto(data.record_photo ?? data.peak_photo ?? null);
+        // Atualização automática da fotografia do recorde em tempo real
+        const photoUrl = data.record_photo ?? data.peak_photo ?? null;
+        const recordTime = data.record_time ?? data.peak_time ?? "";
+        setRecordPhoto(photoUrl, recordTime, recCount);
 
         document.getElementById("record-date").textContent =
           data.record_date ?? data.peak_date ?? "Aguardando registro";
@@ -579,7 +599,14 @@
         document.getElementById("record-time").textContent =
           data.record_time ?? data.peak_time ?? "--:--:--";
 
-        document.getElementById("camera-status").textContent = "CÂMERA ONLINE";
+        // Se o servidor relatar que a câmera está online mas o stream de vídeo estiver desconectado, reconecta automaticamente
+        if (data.camera_online && !isVideoConnected && !reconnectTimer) {
+          video.src = `/video_feed?t=${Date.now()}`;
+        }
+
+        document.getElementById("camera-status").textContent =
+          data.camera_online ? "CÂMERA ONLINE" : "MODO SIMULAÇÃO";
+
       } catch (error) {
         console.error("Erro ao atualizar dashboard:", error);
         document.getElementById("camera-status").textContent = "SERVIDOR OFFLINE";
@@ -587,7 +614,8 @@
     }
 
     updateDashboard();
-    setInterval(updateDashboard, 1000);
+    // Consulta métricas e fotos a cada 800ms para atualização contínua e instantânea
+    setInterval(updateDashboard, 800);
   </script>
 </body>
 

@@ -24,16 +24,18 @@ from collections import deque
 
 
 class DualCameraSystem:
-    def __init__(self, cam1_source=0, cam2_source=1, capacity=25, config_path="config.json"):
+    def __init__(self, cam1_source=0, cam2_source=1, capacity=100, config_path="config.json"):
         self.config_path = config_path
-        self.cam1_source = cam1_source  # Câmera Panorâmica (Salão)
+        self.cam1_source = cam1_source  # Câmera Panorâmica (Salão / Espaço Aberto)
         self.room_capacity = capacity
+        self.confidence_threshold = 0.35
+        self.max_detections = 300       # Suporte para até 300 pessoas simultâneas
 
         self.lock = threading.Lock()
         self.is_running = False
 
-        # Estado da Câmera Panorâmica
-        self.frame_panoramic = None
+        # Estado da Câmera Panorâmica (inicializa com frame de standby para o stream nunca ficar nulo)
+        self.frame_panoramic, _ = self._create_mock_panoramic_frame(0)
         self.raw_count = 0
         self.count_panoramic = 0
         self.recent_counts = deque(maxlen=5)  # Mediana dos últimos 5 frames
@@ -107,14 +109,25 @@ class DualCameraSystem:
 
     def load_config(self):
         """Carrega configurações do arquivo config.json se existir."""
-        if os.path.exists(self.config_path):
-            try:
-                with open(self.config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    self.room_capacity = cfg.get("room_capacity", self.room_capacity)
-                    self.cam1_source = cfg.get("camera_source", self.cam1_source)
-            except Exception as e:
-                print(f"[PROJETO 2] Erro ao carregar config.json: {e}")
+        # Tenta na raiz do projeto ou no caminho fornecido
+        paths_to_check = [
+            self.config_path,
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config.json"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        ]
+        for cp in paths_to_check:
+            if cp and os.path.exists(cp):
+                try:
+                    with open(cp, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                        self.room_capacity = cfg.get("room_capacity", self.room_capacity)
+                        self.cam1_source = cfg.get("camera_source", self.cam1_source)
+                        self.confidence_threshold = cfg.get("confidence_threshold", self.confidence_threshold)
+                        self.max_detections = cfg.get("max_detections", self.max_detections)
+                        print(f"[CONFIG] Carregado de {cp}: Capacidade={self.room_capacity} pessoas, Conf={self.confidence_threshold}")
+                        return
+                except Exception as e:
+                    print(f"[PROJETO 2] Erro ao carregar config.json de {cp}: {e}")
 
     def init_model(self):
         """Inicializa o modelo YOLOv8 para detecção de pessoas."""
@@ -164,8 +177,15 @@ class DualCameraSystem:
         boxes_coords = []
 
         # Detecção de pessoas (Classe 0 = person no dataset COCO)
+        # max_det=300 permite detectar multidões com mais de 50, 100 ou 200 pessoas em espaços abertos
         if self.use_yolo:
-            results = self.model.predict(frame, classes=[0], conf=0.40, verbose=False)
+            results = self.model.predict(
+                frame,
+                classes=[0],
+                conf=self.confidence_threshold,
+                max_det=self.max_detections,
+                verbose=False
+            )
             if results and len(results) > 0 and results[0].boxes is not None:
                 boxes = results[0].boxes
                 for box in boxes:
@@ -190,28 +210,32 @@ class DualCameraSystem:
         # Renderização visual sobre o frame
         display_frame = frame.copy()
 
-        # Desenha caixas delimitadoras neon com rótulos numerados
+        # Desenho adaptativo para espaços abertos e multidões
+        is_crowd = (raw_count > 25)
+        box_thickness = 1 if is_crowd else 2
+
         for idx, (x1, y1, x2, y2, conf) in enumerate(boxes_coords):
             # Caixa Ciano Neon
-            cv2.rectangle(display_frame, (x1, y1), (x2, y2), (255, 240, 0), 2)
+            cv2.rectangle(display_frame, (x1, y1), (x2, y2), (255, 240, 0), box_thickness)
 
-            # Cantos reforçados
-            corner_len = min(16, (x2 - x1) // 3)
-            cv2.line(display_frame, (x1, y1), (x1 + corner_len, y1), (0, 240, 255), 3)
-            cv2.line(display_frame, (x1, y1), (x1, y1 + corner_len), (0, 240, 255), 3)
-            cv2.line(display_frame, (x2, y1), (x2 - corner_len, y1), (0, 240, 255), 3)
-            cv2.line(display_frame, (x2, y1), (x2, y1 + corner_len), (0, 240, 255), 3)
-            cv2.line(display_frame, (x1, y2), (x1 + corner_len, y2), (0, 240, 255), 3)
-            cv2.line(display_frame, (x1, y2), (x1, y2 - corner_len), (0, 240, 255), 3)
-            cv2.line(display_frame, (x2, y2), (x2 - corner_len, y2), (0, 240, 255), 3)
-            cv2.line(display_frame, (x2, y2), (x2, y2 - corner_len), (0, 240, 255), 3)
+            if not is_crowd:
+                # Cantos reforçados para visualização nítida
+                corner_len = min(14, (x2 - x1) // 3)
+                cv2.line(display_frame, (x1, y1), (x1 + corner_len, y1), (0, 240, 255), 2)
+                cv2.line(display_frame, (x1, y1), (x1, y1 + corner_len), (0, 240, 255), 2)
+                cv2.line(display_frame, (x2, y1), (x2 - corner_len, y1), (0, 240, 255), 2)
+                cv2.line(display_frame, (x2, y1), (x2, y1 + corner_len), (0, 240, 255), 2)
+                label = f"Pessoa {idx + 1}"
+                font_scale = 0.45
+            else:
+                # Modo multidão (>25 pessoas): rótulo ultracompacto para não poluir
+                label = f"#{idx + 1}"
+                font_scale = 0.38
 
-            # Rótulo exigido: "Pessoa 1, 2, 3..."
-            label = f"Pessoa {idx + 1}"
-            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.48, 1)
-            cv2.rectangle(display_frame, (x1, max(0, y1 - 22)), (x1 + tw + 10, y1), (255, 240, 0), -1)
-            cv2.putText(display_frame, label, (x1 + 5, max(14, y1 - 6)),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, (10, 15, 25), 2, cv2.LINE_AA)
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
+            cv2.rectangle(display_frame, (x1, max(0, y1 - th - 6)), (x1 + tw + 6, y1), (255, 240, 0), -1)
+            cv2.putText(display_frame, label, (x1 + 3, max(th + 2, y1 - 4)),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (10, 15, 25), 1, cv2.LINE_AA)
 
         # Barra superior tecnológica no vídeo
         overlay = display_frame.copy()

@@ -14,8 +14,8 @@ from dual_detector import DualCameraSystem
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Inicializa o sistema de monitoramento panorâmico
-dual_system = DualCameraSystem(cam1_source=0, cam2_source=1, capacity=25)
+# Inicializa o sistema de monitoramento panorâmico para espaços abertos (até 100+ pessoas)
+dual_system = DualCameraSystem(cam1_source=0, cam2_source=1, capacity=100)
 dual_system.run_camera_threads()
 
 @app.route("/")
@@ -29,18 +29,26 @@ def generate_cam1_stream():
         if frame_bytes is not None:
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        threading.Event().wait(0.04)
+        threading.Event().wait(0.035)
 
 @app.route("/cam1_feed")
 def cam1_feed():
-    return Response(generate_cam1_stream(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    response = Response(generate_cam1_stream(),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route("/video_feed")
 def video_feed():
-    """Alias para /cam1_feed."""
-    return Response(generate_cam1_stream(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    """Alias principal para o stream da câmera panorâmica."""
+    response = Response(generate_cam1_stream(),
+                        mimetype='multipart/x-mixed-replace; boundary=frame')
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route("/cam2_feed")
 def cam2_feed():
