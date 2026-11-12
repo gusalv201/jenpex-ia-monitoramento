@@ -17,7 +17,7 @@ env/
 Thumbs.db
 Desktop.ini
 
-# Pesos baixados do YOLO, capturas e bancos locais
+# Pesos baixados do YOLO, capturas e bancos locais (Grupo 1)
 *.pt
 !yolov8n.pt
 capturas/
@@ -25,3 +25,7 @@ resultados/
 weights/
 *.db
 *.sqlite3
+
+# Snapshots e dados em tempo real (Grupo 2)
+src/projeto2_dupla_camera/static/*.jpg
+src/projeto2_dupla_camera/static/*.json

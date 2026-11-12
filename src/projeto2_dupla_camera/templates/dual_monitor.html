@@ -1,300 +1,622 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JENPEX - Sistema de Dupla Câmera de Ocupação da Sala</title>
+  <title>JENPEX Vision | Monitoramento Panorâmico</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap"
+    rel="stylesheet">
   <style>
     :root {
-      --bg: #090e17;
-      --card: rgba(18, 27, 44, 0.8);
-      --border: rgba(255, 255, 255, 0.08);
-      --cyan: #00f0ff;
-      --green: #00e676;
-      --yellow: #ffab00;
-      --red: #ff1744;
-      --text: #f0f4f8;
-      --muted: #8899aa;
+      color-scheme: dark;
+      --bg: #080d16;
+      --panel: #111b2b;
+      --panel-2: #0d1726;
+      --border: rgba(255, 255, 255, .09);
+      --text: #f3f7fc;
+      --muted: #91a0b5;
+      --cyan: #28d9f2;
+      --green: #24df91;
+      --yellow: #ffc45c;
+      --red: #ff5572;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      background: radial-gradient(circle at 50% 0%, #15253d 0%, var(--bg) 80%);
-      color: var(--text);
-      font-family: 'Outfit', sans-serif;
+      margin: 0;
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+      background: radial-gradient(ellipse at 15% 0%, #14243b 0%, var(--bg) 55%);
+      color: var(--text);
+      font-family: Outfit, sans-serif;
     }
 
     header {
-      padding: 1.2rem 2.5rem;
+      min-height: 82px;
+      padding: 18px 3.2%;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
+      gap: 20px;
       border-bottom: 1px solid var(--border);
-      background: rgba(9, 14, 23, 0.9);
-      backdrop-filter: blur(10px);
+      background: rgba(8, 13, 22, .82);
     }
 
-    .badge {
-      background: linear-gradient(135deg, #00f0ff, #0070f3);
-      color: #000;
-      padding: 0.35rem 0.8rem;
-      border-radius: 6px;
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      padding: 9px 12px;
+      border-radius: 9px;
+      color: #06121b;
+      background: linear-gradient(135deg, var(--cyan), #3988ff);
       font-weight: 900;
-      font-size: 0.85rem;
       letter-spacing: 1px;
     }
 
-    .title { font-size: 1.35rem; font-weight: 800; }
-    .subtitle { font-size: 0.85rem; color: var(--muted); }
+    h1 {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 25px);
+    }
+
+    .subtitle {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--green);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .7px;
+    }
+
+    .live-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 13px currentColor;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 10px 13px;
+      color: var(--text);
+      background: rgba(255, 255, 255, .06);
+      cursor: pointer;
+      font: 600 13px Outfit, sans-serif;
+    }
+
+    button:hover {
+      border-color: var(--cyan);
+      background: rgba(40, 217, 242, .1);
+    }
 
     main {
-      flex: 1;
-      padding: 1.8rem 2.5rem;
-      display: grid;
-      grid-template-columns: 1fr 1.3fr;
-      gap: 2rem;
-      max-width: 1650px;
+      width: min(1800px, 100%);
       margin: 0 auto;
-      width: 100%;
+      padding: 26px 3.2% 32px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.85fr) minmax(330px, .85fr);
+      gap: 22px;
     }
 
-    /* Placar Central de Lotação */
-    .occupancy-hero {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      padding: 2.5rem 2rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      box-shadow: 0 15px 50px rgba(0, 0, 0, 0.4);
-    }
-
-    .status-badge {
-      padding: 0.7rem 1.8rem;
-      border-radius: 50px;
-      font-size: 1.2rem;
-      font-weight: 800;
-      letter-spacing: 1px;
-      margin-bottom: 1.5rem;
-    }
-
-    .status-badge.success {
-      background: rgba(0, 230, 118, 0.15);
-      border: 1px solid var(--green);
-      color: var(--green);
-      box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
-    }
-
-    .status-badge.danger {
-      background: rgba(255, 23, 68, 0.2);
-      border: 1px solid var(--red);
-      color: var(--red);
-      box-shadow: 0 0 35px rgba(255, 23, 68, 0.4);
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.03); }
-    }
-
-    .count-number {
-      font-size: 7.5rem;
-      font-weight: 900;
-      line-height: 1;
-      letter-spacing: -2px;
-      margin-bottom: 0.5rem;
-    }
-
-    .count-limit {
-      font-size: 1.8rem;
-      color: var(--muted);
-      margin-bottom: 1.5rem;
-    }
-
-    /* Comparador de Câmeras */
-    .dual-audit-box {
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 1rem 1.5rem;
-      width: 100%;
-      max-width: 420px;
-      margin-bottom: 1.5rem;
-      display: flex;
-      justify-content: space-around;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .audit-stat {
-      text-align: center;
-    }
-
-    .audit-stat div:first-child {
-      font-size: 0.75rem;
-      color: var(--muted);
-      margin-bottom: 0.3rem;
-    }
-
-    .audit-stat div:last-child {
-      font-size: 1.6rem;
-      font-weight: 700;
-    }
-
-    /* Grid das Duas Câmeras */
-    .cameras-container {
-      display: flex;
-      flex-direction: column;
-      gap: 1.2rem;
-    }
-
-    .camera-card {
-      background: var(--card);
+    .panel {
+      background: linear-gradient(145deg, rgba(20, 32, 51, .96), rgba(12, 21, 35, .96));
       border: 1px solid var(--border);
       border-radius: 20px;
+      box-shadow: 0 18px 55px rgba(0, 0, 0, .25);
       overflow: hidden;
-      display: flex;
-      flex-direction: column;
     }
 
-    .camera-header {
-      padding: 0.8rem 1.2rem;
-      border-bottom: 1px solid var(--border);
+    .camera-panel {
+      min-width: 0;
+    }
+
+    .panel-heading {
+      min-height: 62px;
+      padding: 17px 20px;
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .panel-heading h2 {
+      margin: 0;
+      font-size: 16px;
       font-weight: 700;
     }
 
-    .cam-feed {
-      width: 100%;
-      height: 240px;
-      background: #000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    .camera-tag {
+      color: var(--cyan);
+      font: 12px "JetBrains Mono", monospace;
+      border: 1px solid rgba(40, 217, 242, .25);
+      background: rgba(40, 217, 242, .08);
+      padding: 6px 9px;
+      border-radius: 7px;
     }
 
-    .cam-feed img {
+    .camera-frame {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 360px;
+      background: #030609;
+      display: grid;
+      place-items: center;
+    }
+
+    .camera-frame img {
+      display: block;
       width: 100%;
       height: 100%;
+      object-fit: contain;
+    }
+
+    .camera-offline {
+      display: none;
+      padding: 30px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .camera-footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding: 13px 20px;
+      color: var(--muted);
+      font-size: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .current-card {
+      padding: 23px;
+    }
+
+    .eyebrow {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.6px;
+    }
+
+    .current-number {
+      margin: 8px 0 2px;
+      font: 800 clamp(70px, 8vw, 112px)/1 "JetBrains Mono", monospace;
+      letter-spacing: -7px;
+      color: var(--green);
+    }
+
+    .current-caption {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .occupancy-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 20px;
+      padding: 8px 12px;
+      border-radius: 30px;
+      color: var(--green);
+      background: rgba(36, 223, 145, .1);
+      border: 1px solid rgba(36, 223, 145, .22);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .5px;
+    }
+
+    .occupancy-status.warning {
+      color: var(--yellow);
+      background: rgba(255, 196, 92, .1);
+      border-color: rgba(255, 196, 92, .25);
+    }
+
+    .occupancy-status.danger {
+      color: var(--red);
+      background: rgba(255, 85, 114, .1);
+      border-color: rgba(255, 85, 114, .25);
+    }
+
+    .record-card {
+      padding-bottom: 17px;
+    }
+
+    .record-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .record-title .trophy {
+      font-size: 19px;
+    }
+
+    .record-content {
+      padding: 17px 18px 0;
+    }
+
+    .record-number {
+      font: 800 48px/1 "JetBrains Mono", monospace;
+      color: var(--yellow);
+      margin: 0 0 6px;
+    }
+
+    .record-description {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+
+    .record-photo {
+      width: 100%;
+      aspect-ratio: 16/9;
       object-fit: cover;
+      display: block;
+      border-radius: 12px;
+      background: #050a12;
+      border: 1px solid var(--border);
+    }
+
+    .record-placeholder {
+      aspect-ratio: 16/9;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      background: rgba(255, 255, 255, .035);
+      border: 1px dashed var(--border);
+    }
+
+    .record-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 13px;
+    }
+
+    .meta-box {
+      padding: 11px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .035);
+    }
+
+    .meta-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .meta-value {
+      margin-top: 5px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .system-footer {
+      width: min(1800px, 100%);
+      margin: 0 auto;
+      padding: 0 3.2% 24px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .system-footer strong {
+      color: var(--text);
+    }
+
+    @media (max-width: 1050px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .right-column {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+      }
+    }
+
+    @media (max-width: 650px) {
+      header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .header-right {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      main {
+        padding: 16px 4%;
+        gap: 15px;
+      }
+
+      .camera-frame {
+        min-height: 220px;
+      }
+
+      .right-column {
+        display: flex;
+      }
+
+      .current-number {
+        font-size: 76px;
+      }
+
+      .system-footer {
+        padding: 0 4% 20px;
+        flex-direction: column;
+      }
     }
   </style>
 </head>
+
 <body>
   <header>
-    <div style="display: flex; align-items: center; gap: 1rem;">
-      <div class="badge">PROJETO 2 • JENPEX</div>
+    <div class="brand">
+      <div class="brand-mark">JENPEX</div>
       <div>
-        <div class="title">Sistema de Dupla Câmera de Ocupação da Sala</div>
-        <div class="subtitle">Visão Panorâmica Interna + Linha de Fluxo na Porta • Auditoria em Tempo Real</div>
+        <h1>Monitoramento Panorâmico</h1>
+        <div class="subtitle">Contagem inteligente de pessoas • IFMT JENPEX 2026</div>
       </div>
     </div>
-    <button onclick="document.documentElement.requestFullscreen()" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #fff; padding: 0.5rem 1rem; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.85rem;">
-      ⛶ Tela Cheia (F11)
-    </button>
+    <div class="header-right">
+      <span class="live-indicator"><span class="live-dot"></span> SISTEMA AO VIVO</span>
+      <button type="button" onclick="toggleFullScreen()">⛶ Tela cheia</button>
+    </div>
   </header>
 
   <main>
-    <!-- Placar Central de Lotação -->
-    <div class="occupancy-hero">
-      <div class="status-badge success" id="status-badge">
-        ENTRADA PERMITIDA
+    <section class="panel camera-panel">
+      <div class="panel-heading">
+        <h2>📹 Câmera panorâmica — visão em tempo real</h2>
+        <span class="camera-tag" id="camera-status">CONECTANDO...</span>
       </div>
-
-      <div style="font-size: 1rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); font-weight: 700;">
-        Pessoas na Sala (Lotação Auditada)
-      </div>
-
-      <div class="count-number" id="count-number">0</div>
-      <div class="count-limit" id="count-limit">/ 30 VAGAS MÁXIMAS</div>
-
-      <!-- Caixa Comparativa de Auditoria -->
-      <div class="dual-audit-box">
-        <div class="audit-stat">
-          <div>CAM 1: SALÃO</div>
-          <div style="color: var(--cyan)" id="val-panoramic">0</div>
-        </div>
-        <div style="border-left: 1px solid var(--border);"></div>
-        <div class="audit-stat">
-          <div>CAM 2: PORTA</div>
-          <div style="color: var(--green)" id="val-gate">0</div>
-        </div>
-        <div style="border-left: 1px solid var(--border);"></div>
-        <div class="audit-stat">
-          <div>DIVERGÊNCIA</div>
-          <div style="color: var(--yellow)" id="val-diff">0</div>
+      <div class="camera-frame">
+        <img src="/video_feed" id="video-stream" alt="Transmissão da câmera panorâmica">
+        <div class="camera-offline" id="camera-offline">
+          <div>
+            <div style="font-size:38px;margin-bottom:10px">📷</div>
+            <strong>Câmera indisponível</strong>
+            <p style="margin-top:6px">Verifique a conexão da câmera e o servidor.</p>
+          </div>
         </div>
       </div>
-
-      <div style="font-size: 0.85rem; color: var(--muted);" id="audit-msg">
-        Auditoria: Validação Sincronizada entre Câmeras
+      <div class="camera-footer">
+        <span>Fonte: câmera panorâmica única</span>
+        <span id="fps-label">FPS: --</span>
       </div>
-    </div>
+    </section>
 
-    <!-- Visão das Duas Câmeras -->
-    <div class="cameras-container">
-      <!-- Câmera 1: Panorâmica -->
-      <div class="camera-card">
-        <div class="camera-header">
-          <span style="color: var(--cyan);">📹 CÂMERA 1: VISÃO PANORÂMICA (INTERNA DO SALÃO)</span>
-          <span id="cam1-stat">Pessoas detectadas: 0</span>
+    <aside class="right-column">
+      <section class="panel current-card">
+        <div class="eyebrow">Ocupação neste momento</div>
+        <div class="current-number" id="current-count">0</div>
+        <div class="current-caption">pessoas presentes na sala</div>
+        <div class="occupancy-status" id="occupancy-status">
+          <span class="live-dot"></span>
+          <span id="status-label">MONITORANDO</span>
         </div>
-        <div class="cam-feed">
-          <img src="/cam1_feed" alt="Câmera 1 Panorâmica">
-        </div>
-      </div>
+      </section>
 
-      <!-- Câmera 2: Porta -->
-      <div class="camera-card">
-        <div class="camera-header">
-          <span style="color: var(--green);">🚪 CÂMERA 2: LINHA VIRTUAL DE FLUXO (HALL DE ENTRADA)</span>
-          <span id="cam2-stat">IN: 0 | OUT: 0</span>
+      <section class="panel record-card">
+        <div class="panel-heading">
+          <div class="record-title">
+            <span class="trophy">🏆</span>
+            <h2>Recorde de lotação</h2>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <button type="button" onclick="resetRecord()" style="padding:4px 9px;font-size:11px;opacity:0.75;" title="Zerar recorde histórico">Zerar</button>
+            <span class="camera-tag">MÁXIMO</span>
+          </div>
         </div>
-        <div class="cam-feed">
-          <img src="/cam2_feed" alt="Câmera 2 Portaria">
+        <div class="record-content">
+          <div class="record-number" id="record-count">0</div>
+          <div class="record-description">maior número de pessoas presentes simultaneamente</div>
+
+          <img class="record-photo" id="record-photo" src="" alt="Foto do momento do recorde" hidden>
+          <div class="record-placeholder" id="record-placeholder">
+            A foto do recorde aparecerá aqui quando o sistema registrar um novo máximo.
+          </div>
+
+          <div class="record-meta">
+            <div class="meta-box">
+              <div class="meta-label">Data</div>
+              <div class="meta-value" id="record-date">Aguardando registro</div>
+            </div>
+            <div class="meta-box">
+              <div class="meta-label">Horário</div>
+              <div class="meta-value" id="record-time">--:--:--</div>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </aside>
   </main>
 
+  <div class="system-footer">
+    <span>JENPEX Vision • Monitoramento de ocupação por visão computacional</span>
+    <span>Modelo de IA: <strong id="model-label">--</strong></span>
+  </div>
+
   <script>
-    async function updateDualStatus() {
+    const video = document.getElementById("video-stream");
+    const offlineMessage = document.getElementById("camera-offline");
+    let isVideoConnected = false;
+    let lastRecordVersion = "";
+    let reconnectTimer = null;
+
+    video.addEventListener("load", () => {
+      video.style.display = "block";
+      offlineMessage.style.display = "none";
+      isVideoConnected = true;
+      document.getElementById("camera-status").textContent = "CÂMERA ONLINE";
+    });
+
+    video.addEventListener("error", () => {
+      video.style.display = "none";
+      offlineMessage.style.display = "grid";
+      isVideoConnected = false;
+      document.getElementById("camera-status").textContent = "RECONECTANDO...";
+      
+      // Auto-reconexão instantânea do stream de vídeo caso oscile
+      if (!reconnectTimer) {
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          video.src = `/video_feed?t=${Date.now()}`;
+        }, 1500);
+      }
+    });
+
+    async function resetRecord() {
+      if (!confirm("Tem certeza que deseja zerar o recorde de pessoas histórico?")) return;
       try {
-        const res = await fetch('/api/dual_status');
-        if (!res.ok) return;
-        const d = await res.json();
-
-        document.getElementById('count-number').textContent = d.audited_occupancy;
-        document.getElementById('count-limit').textContent = `/ ${d.room_capacity} VAGAS MÁXIMAS`;
-
-        document.getElementById('val-panoramic').textContent = d.count_panoramic;
-        document.getElementById('val-gate').textContent = d.count_gate;
-        document.getElementById('val-diff').textContent = d.discrepancy;
-
-        document.getElementById('cam1-stat').textContent = `Pessoas detectadas: ${d.count_panoramic}`;
-        document.getElementById('cam2-stat').textContent = `IN: ${d.in_count} | OUT: ${d.out_count}`;
-
-        const badge = document.getElementById('status-badge');
-        badge.className = `status-badge ${d.status_color}`;
-        badge.textContent = d.status_label;
-
-        document.getElementById('audit-msg').textContent = `Auditoria: ${d.audit_status}`;
-      } catch (e) {}
+        const resp = await fetch("/api/reset_record", { method: "POST" });
+        if (resp.ok) {
+          lastRecordVersion = "";
+          updateDashboard();
+        }
+      } catch (err) {
+        console.error("Erro ao zerar recorde:", err);
+      }
     }
 
-    setInterval(updateDualStatus, 600);
-    updateDualStatus();
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen?.().catch(console.warn);
+      } else {
+        document.exitFullscreen?.();
+      }
+    }
+
+    function setRecordPhoto(photoUrl, recordTime, recordCount) {
+      const photo = document.getElementById("record-photo");
+      const placeholder = document.getElementById("record-placeholder");
+
+      if (photoUrl && recordCount > 0) {
+        const versionKey = `${recordCount}_${recordTime}`;
+        // Se bateu um novo recorde, força o navegador a atualizar a imagem imediatamente
+        if (versionKey !== lastRecordVersion) {
+          lastRecordVersion = versionKey;
+          photo.src = `${photoUrl}?v=${Date.now()}`;
+        }
+        photo.hidden = false;
+        placeholder.hidden = true;
+      } else {
+        lastRecordVersion = "";
+        photo.removeAttribute("src");
+        photo.hidden = true;
+        placeholder.hidden = false;
+      }
+    }
+
+    async function updateDashboard() {
+      try {
+        const response = await fetch("/api/status", { cache: "no-store" });
+        if (!response.ok) throw new Error("Falha ao consultar o servidor");
+
+        const data = await response.json();
+
+        document.getElementById("current-count").textContent =
+          Number(data.current_count ?? 0);
+
+        const recCount = Number(data.record_count ?? data.peak_count ?? 0);
+        document.getElementById("record-count").textContent = recCount;
+
+        document.getElementById("fps-label").textContent =
+          `FPS: ${data.fps ?? "--"}`;
+
+        document.getElementById("model-label").textContent =
+          data.ai_model ?? "YOLOv8";
+
+        const status = document.getElementById("occupancy-status");
+        const statusLabel = document.getElementById("status-label");
+        const current = Number(data.current_count ?? 0);
+        const capacity = Number(data.room_capacity ?? 100);
+
+        status.className = "occupancy-status";
+        if (capacity > 0 && current >= capacity) {
+          status.classList.add("danger");
+          statusLabel.textContent = "LOTAÇÃO MÁXIMA";
+        } else if (capacity > 0 && current >= capacity * 0.8) {
+          status.classList.add("warning");
+          statusLabel.textContent = "PRÓXIMO DA LOTAÇÃO";
+        } else {
+          statusLabel.textContent = "MONITORAMENTO NORMAL";
+        }
+
+        // Atualização automática da fotografia do recorde em tempo real
+        const photoUrl = data.record_photo ?? data.peak_photo ?? null;
+        const recordTime = data.record_time ?? data.peak_time ?? "";
+        setRecordPhoto(photoUrl, recordTime, recCount);
+
+        document.getElementById("record-date").textContent =
+          data.record_date ?? data.peak_date ?? "Aguardando registro";
+
+        document.getElementById("record-time").textContent =
+          data.record_time ?? data.peak_time ?? "--:--:--";
+
+        // Se o servidor relatar que a câmera está online mas o stream de vídeo estiver desconectado, reconecta automaticamente
+        if (data.camera_online && !isVideoConnected && !reconnectTimer) {
+          video.src = `/video_feed?t=${Date.now()}`;
+        }
+
+        document.getElementById("camera-status").textContent =
+          data.camera_online ? "CÂMERA ONLINE" : "MODO SIMULAÇÃO";
+
+      } catch (error) {
+        console.error("Erro ao atualizar dashboard:", error);
+        document.getElementById("camera-status").textContent = "SERVIDOR OFFLINE";
+      }
+    }
+
+    updateDashboard();
+    // Consulta métricas e fotos a cada 800ms para atualização contínua e instantânea
+    setInterval(updateDashboard, 800);
   </script>
 </body>
+
 </html>
