@@ -1,4 +1,17 @@
-# 🚪 TRABALHO 2 - GRUPO 2: SISTEMA DE DUPLA CÂMERA DE OCUPAÇÃO DA SALA (PANORÂMICA + FLUXO)
+# 🚪 TRABALHO 2 - GRUPO 2: SISTEMA DE MONITORAMENTO PANORÂMICO DE OCUPAÇÃO DA SALA (YOLOv8 + RECORDE HISTÓRICO)
+
+---
+
+### 🌟 Atualização da Implementação: Foco em Visão Panorâmica de Alta Cobertura + Recorde de Pessoas
+
+O Grupo 2 desenvolveu a solução completa focada na **Visão Panorâmica de Grande Escala**:
+1. **Vídeo em Tempo Real (Escala Principal à Esquerda):** Exibição em grande formato do salão principal, processado com modelo de inteligência artificial **YOLOv8n**, identificando corpos e centróides de cada participante presente.
+2. **Contador Ao Vivo (À Direita):** Placar em tempo real da quantidade de pessoas no ambiente, com indicador visual de status (**Verde**: Entrada Permitida, **Amarelo**: Atenção, **Vermelho**: Sala Lotada) e barra de progresso da capacidade.
+3. **Módulo de Recorde Histórico de Pessoas (Pico Máximo):**
+   - Detecta automaticamente quando o número de presentes atinge um novo recorde.
+   - Captura e arquiva a **fotografia (snapshot) com marca d'água oficial** do momento do pico.
+   - Exibe em destaque a **foto, o horário e a data exatos** e a **quantidade recorde de pessoas**.
+   - Permite ampliação da foto com um clique em modal interativo e botão para reiniciar medições.
 
 ---
 

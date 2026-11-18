@@ -1,7 +1,16 @@
 """
-Projeto 2 - Sistema de Dupla Câmera de Ocupação e Fluxo (YOLOv8)
-Câmera 1 (Panorâmica): Contagem de pessoas presentes no salão.
-Câmera 2 (Porta): Linha virtual bidirecional (Entrada / Saída).
+Projeto 2 - Sistema de Monitoramento com Visão Panorâmica e Detecção de Ocupação (YOLOv8)
+IFMT - JENPEX 2026 (Grupo 2)
+
+Recursos Principais:
+1. Visão Panorâmica Única em Tempo Real: Câmera cobrindo o salão principal com detecção instantânea de pessoas.
+2. Contagem Ao Vivo com Estabilização: Mediana dos últimos 5 frames para evitar oscilações falsas.
+3. Registro de Recorde de Pessoas (Pico Histórico):
+   - Identifica o momento exato em que houve a maior quantidade de pessoas simultâneas.
+   - Captura e armazena automaticamente a fotografia (snapshot com caixas delimitadoras) do instante recorde.
+   - Registra data, horário e quantidade de pessoas no momento recorde.
+   - Persistência permanente em disco (record_data.json e record_snapshot.jpg).
+4. Suporte Robusto a Webcams Físicas (Microsoft Media Foundation / DirectShow) e Fallback Simulado.
 """
 
 import cv2
@@ -11,243 +20,556 @@ import json
 import os
 import threading
 from datetime import datetime
+from collections import deque
+
 
 class DualCameraSystem:
-    def __init__(self, cam1_source=0, cam2_source=1, capacity=30):
-        self.cam1_source = cam1_source # Panorâmica
-        self.cam2_source = cam2_source # Porta
+    def __init__(self, cam1_source=0, cam2_source=1, capacity=100, config_path="config.json"):
+        self.config_path = config_path
+        self.cam1_source = cam1_source  # Câmera Panorâmica (Salão / Espaço Aberto)
         self.room_capacity = capacity
+        self.confidence_threshold = 0.35
+        self.max_detections = 300       # Suporte para até 300 pessoas simultâneas
 
         self.lock = threading.Lock()
         self.is_running = False
 
-        # Estado da Câmera 1 (Panorâmica)
-        self.frame_panoramic = None
+        # Estado da Câmera Panorâmica (inicializa com frame de standby para o stream nunca ficar nulo)
+        self.frame_panoramic, _ = self._create_mock_panoramic_frame(0)
+        self.raw_count = 0
         self.count_panoramic = 0
+        self.recent_counts = deque(maxlen=5)  # Mediana dos últimos 5 frames
         self.fps_cam1 = 0.0
+        self._frame_count = 0
+        self._fps_start_time = time.time()
+        self.camera_online = False
 
-        # Estado da Câmera 2 (Porta - Fluxo)
-        self.frame_door = None
-        self.in_count = 0
-        self.out_count = 0
-        self.count_gate = 0
-        self.fps_cam2 = 0.0
-        self.track_history = {}
-        self.counted_ids = {}
+        # Diretório estático para persistência do recorde
+        self.static_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+        os.makedirs(self.static_dir, exist_ok=True)
+        self.peak_file_path = os.path.join(self.static_dir, "record_snapshot.jpg")
+        self.record_json_path = os.path.join(self.static_dir, "record_data.json")
 
-        # Linha virtual de corte na porta (50% da altura da câmera 2)
-        self.line_pct = 0.50
-        self.buffer_px = 25
+        # Registro de Recorde de Ocupação (Pico Histórico)
+        self.peak_count = 0
+        self.peak_date = "--/--/----"
+        self.peak_time = "--:--:--"
+        self.peak_timestamp = "Aguardando primeiro registro"
+        self.peak_image_bytes = None
+        self.is_new_peak = False
+
+        # Carrega recorde persistente de sessões anteriores
+        self.load_persisted_record()
 
         # Log de eventos
         self.events_log = []
+        self._log_event("Sistema de Monitoramento Panorâmico Inicializado.", "info")
 
-        # Modelo YOLOv8
+        # Carrega configurações personalizadas se existirem
+        self.load_config()
+
+        # Inicializa o modelo de IA YOLOv8
         self.init_model()
 
+    def load_persisted_record(self):
+        """Carrega o recorde salvo em disco para persistir entre reinicializações."""
+        if os.path.exists(self.record_json_path):
+            try:
+                with open(self.record_json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    self.peak_count = int(data.get("record_count", 0))
+                    self.peak_date = data.get("record_date", "--/--/----")
+                    self.peak_time = data.get("record_time", "--:--:--")
+                    self.peak_timestamp = f"{self.peak_date} às {self.peak_time}"
+                    print(f"[RECORDE] Recorde persistente carregado: {self.peak_count} pessoas ({self.peak_timestamp})")
+            except Exception as e:
+                print(f"[RECORDE] Erro ao carregar record_data.json: {e}")
+
+        # Se já existir a foto salva fisicamente, carrega seus bytes
+        if os.path.exists(self.peak_file_path):
+            try:
+                with open(self.peak_file_path, "rb") as f:
+                    self.peak_image_bytes = f.read()
+            except Exception:
+                pass
+
+    def save_persisted_record(self):
+        """Salva os dados do recorde em arquivo JSON e fotografia em JPG."""
+        record_data = {
+            "record_count": self.peak_count,
+            "record_date": self.peak_date,
+            "record_time": self.peak_time,
+            "record_timestamp": self.peak_timestamp
+        }
+        try:
+            with open(self.record_json_path, "w", encoding="utf-8") as f:
+                json.dump(record_data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"[RECORDE] Erro ao gravar record_data.json: {e}")
+
+    def load_config(self):
+        """Carrega configurações do arquivo config.json se existir."""
+        # Tenta na raiz do projeto ou no caminho fornecido
+        paths_to_check = [
+            self.config_path,
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "config.json"),
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        ]
+        for cp in paths_to_check:
+            if cp and os.path.exists(cp):
+                try:
+                    with open(cp, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                        self.room_capacity = cfg.get("room_capacity", self.room_capacity)
+                        self.cam1_source = cfg.get("camera_source", self.cam1_source)
+                        self.confidence_threshold = cfg.get("confidence_threshold", self.confidence_threshold)
+                        self.max_detections = cfg.get("max_detections", self.max_detections)
+                        print(f"[CONFIG] Carregado de {cp}: Capacidade={self.room_capacity} pessoas, Conf={self.confidence_threshold}")
+                        return
+                except Exception as e:
+                    print(f"[PROJETO 2] Erro ao carregar config.json de {cp}: {e}")
+
     def init_model(self):
-        from ultralytics import YOLO
-        print("[PROJETO 2] Carregando modelo YOLOv8n para o Sistema de Dupla Câmera...")
-        self.model = YOLO("yolov8n.pt")
-        print("[PROJETO 2] Sistema de Dupla Câmera pronto!")
+        """Inicializa o modelo YOLOv8 para detecção de pessoas."""
+        self.use_yolo = False
+        try:
+            from ultralytics import YOLO
+            # Procura o modelo no diretório local ou na raiz do projeto
+            model_path = "yolov8n.pt"
+            if not os.path.exists(model_path):
+                parent_model = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                    "yolov8n.pt"
+                )
+                if os.path.exists(parent_model):
+                    model_path = parent_model
+
+            print(f"[PROJETO 2] Carregando YOLOv8n de {model_path}...")
+            self.model = YOLO(model_path)
+            self.use_yolo = True
+            print("[PROJETO 2] YOLOv8n inicializado com sucesso!")
+        except Exception as e:
+            print(f"[PROJETO 2] Aviso ao carregar YOLOv8: {e}. Usando fallback HOG.")
+            self.hog = cv2.HOGDescriptor()
+            self.hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+            self.use_yolo = False
+
+    def _log_event(self, text, event_type="info"):
+        """Adiciona um evento ao histórico com timestamp."""
+        now_str = datetime.now().strftime("%H:%M:%S")
+        self.events_log.insert(0, {
+            "time": now_str,
+            "text": text,
+            "type": event_type
+        })
+        if len(self.events_log) > 20:
+            self.events_log.pop()
 
     def process_panoramic(self, frame):
-        """Processa câmera panorâmica: conta quantas pessoas estão no salão."""
-        results = self.model.predict(frame, classes=[0], conf=0.40, verbose=False)
-        detected_count = 0
-
-        if results and len(results) > 0 and results[0].boxes is not None:
-            boxes = results[0].boxes
-            detected_count = len(boxes)
-            for box in boxes:
-                xyxy = box.xyxy[0].cpu().numpy()
-                x1, y1, x2, y2 = map(int, xyxy)
-                conf = float(box.conf[0])
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 128), 2)
-                cv2.putText(frame, f"Pessoa ({conf*100:.0f}%)", (x1, max(20, y1 - 5)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 128), 1)
-
-        cv2.putText(frame, f"CAM 1 [PANORAMICA] - PRESENTES NO SALAO: {detected_count}",
-                    (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-
-        return frame, detected_count
-
-    def process_door(self, frame):
-        """Processa câmera da porta com linha virtual de entrada e saída."""
+        """
+        Processa o frame da câmera panorâmica:
+        1. Detecta pessoas no salão em tempo real com YOLOv8n.
+        2. Desenha caixas delimitadoras neon numeradas ("Pessoa 1, 2, 3...").
+        3. Aplica estabilização da contagem pela mediana móvel dos últimos 5 frames.
+        4. Compara com o recorde histórico e captura o momento de pico.
+        """
         h, w, _ = frame.shape
-        line_y = int(h * self.line_pct)
+        boxes_coords = []
 
-        results = self.model.track(frame, persist=True, classes=[0], conf=0.45, verbose=False)
+        # Detecção de pessoas (Classe 0 = person no dataset COCO)
+        # max_det=300 permite detectar multidões com mais de 50, 100 ou 200 pessoas em espaços abertos
+        if self.use_yolo:
+            results = self.model.predict(
+                frame,
+                classes=[0],
+                conf=self.confidence_threshold,
+                max_det=self.max_detections,
+                verbose=False
+            )
+            if results and len(results) > 0 and results[0].boxes is not None:
+                boxes = results[0].boxes
+                for box in boxes:
+                    xyxy = box.xyxy[0].cpu().numpy()
+                    x1, y1, x2, y2 = map(int, xyxy)
+                    conf = float(box.conf[0])
+                    boxes_coords.append((x1, y1, x2, y2, conf))
+        else:
+            # Fallback OpenCV HOG
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            boxes, _ = self.hog.detectMultiScale(gray, winStride=(8, 8), padding=(4, 4), scale=1.05)
+            for (x, y, bw, bh) in boxes:
+                boxes_coords.append((x, y, x + bw, y + bh, 0.75))
 
-        # Desenha a linha de corte
-        cv2.line(frame, (0, line_y), (w, line_y), (255, 200, 0), 2)
-        cv2.putText(frame, "ENTRADA [DESCENDO]", (10, line_y + 20), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 1)
-        cv2.putText(frame, "SAIDA [SUBINDO]", (10, line_y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 140, 255), 1)
+        raw_count = len(boxes_coords)
+        self.raw_count = raw_count
 
-        if results and len(results) > 0 and results[0].boxes is not None:
-            boxes = results[0].boxes
-            for box in boxes:
-                xyxy = box.xyxy[0].cpu().numpy()
-                x1, y1, x2, y2 = map(int, xyxy)
-                track_id = int(box.id[0]) if box.id is not None else None
-                conf = float(box.conf[0])
+        # Estabilização: mediana dos últimos 5 frames para evitar oscilações falsas
+        self.recent_counts.append(raw_count)
+        stable_count = int(np.median(list(self.recent_counts)))
 
-                cx = int((x1 + x2) / 2)
-                cy = int((y1 + y2) / 2)
+        # Renderização visual sobre o frame
+        display_frame = frame.copy()
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 200, 255), 2)
-                cv2.circle(frame, (cx, cy), 4, (0, 0, 255), -1)
+        # Desenho adaptativo para espaços abertos e multidões
+        is_crowd = (raw_count > 25)
+        box_thickness = 1 if is_crowd else 2
 
-                if track_id is not None:
-                    if track_id not in self.track_history:
-                        self.track_history[track_id] = []
-                    self.track_history[track_id].append((cx, cy))
-                    if len(self.track_history[track_id]) > 25:
-                        self.track_history[track_id].pop(0)
+        for idx, (x1, y1, x2, y2, conf) in enumerate(boxes_coords):
+            # Caixa Ciano Neon
+            cv2.rectangle(display_frame, (x1, y1), (x2, y2), (255, 240, 0), box_thickness)
 
-                    points = self.track_history[track_id]
-                    if len(points) >= 2:
-                        prev_y = points[0][1]
-                        curr_y = points[-1][1]
+            if not is_crowd:
+                # Cantos reforçados para visualização nítida
+                corner_len = min(14, (x2 - x1) // 3)
+                cv2.line(display_frame, (x1, y1), (x1 + corner_len, y1), (0, 240, 255), 2)
+                cv2.line(display_frame, (x1, y1), (x1, y1 + corner_len), (0, 240, 255), 2)
+                cv2.line(display_frame, (x2, y1), (x2 - corner_len, y1), (0, 240, 255), 2)
+                cv2.line(display_frame, (x2, y1), (x2, y1 + corner_len), (0, 240, 255), 2)
+                label = f"Pessoa {idx + 1}"
+                font_scale = 0.45
+            else:
+                # Modo multidão (>25 pessoas): rótulo ultracompacto para não poluir
+                label = f"#{idx + 1}"
+                font_scale = 0.38
 
-                        # Entrando (cima para baixo)
-                        if prev_y < (line_y - self.buffer_px) and curr_y > (line_y + self.buffer_px):
-                            if self.counted_ids.get(track_id) != "IN":
-                                with self.lock:
-                                    self.in_count += 1
-                                    self.count_gate = max(0, self.in_count - self.out_count)
-                                    self.counted_ids[track_id] = "IN"
-                                    self.events_log.insert(0, {
-                                        "time": datetime.now().strftime("%H:%M:%S"),
-                                        "type": "ENTRADA",
-                                        "msg": f"Pessoa #{track_id} entrou pela porta"
-                                    })
-                                cv2.line(frame, (0, line_y), (w, line_y), (0, 255, 0), 4)
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)
+            cv2.rectangle(display_frame, (x1, max(0, y1 - th - 6)), (x1 + tw + 6, y1), (255, 240, 0), -1)
+            cv2.putText(display_frame, label, (x1 + 3, max(th + 2, y1 - 4)),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (10, 15, 25), 1, cv2.LINE_AA)
 
-                        # Saindo (baixo para cima)
-                        elif prev_y > (line_y + self.buffer_px) and curr_y < (line_y - self.buffer_px):
-                            if self.counted_ids.get(track_id) != "OUT":
-                                with self.lock:
-                                    self.out_count += 1
-                                    self.count_gate = max(0, self.in_count - self.out_count)
-                                    self.counted_ids[track_id] = "OUT"
-                                    self.events_log.insert(0, {
-                                        "time": datetime.now().strftime("%H:%M:%S"),
-                                        "type": "SAIDA",
-                                        "msg": f"Pessoa #{track_id} saiu pela porta"
-                                    })
-                                cv2.line(frame, (0, line_y), (w, line_y), (0, 0, 255), 4)
+        # Barra superior tecnológica no vídeo
+        overlay = display_frame.copy()
+        cv2.rectangle(overlay, (0, 0), (w, 42), (10, 15, 25), -1)
+        cv2.addWeighted(overlay, 0.75, display_frame, 0.25, 0, display_frame)
 
-        cv2.putText(frame, f"CAM 2 [PORTA] - IN: {self.in_count} | OUT: {self.out_count} (SALDO: {self.count_gate})",
-                    (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+        # Indicador AO VIVO pulsante
+        cv2.circle(display_frame, (20, 21), 6, (0, 0, 255), -1)
+        cv2.putText(display_frame, "AO VIVO", (34, 26),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
 
-        return frame
+        # Título da Câmera
+        cv2.putText(display_frame, "VISAO PANORAMICA (SALAO)", (125, 26),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 240, 255), 1, cv2.LINE_AA)
+
+        # Contador de pessoas na barra
+        count_text = f"PESSOAS: {stable_count}"
+        (cw, _), _ = cv2.getTextSize(count_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+        cv2.putText(display_frame, count_text, (w - cw - 20, 26),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 128), 2, cv2.LINE_AA)
+
+        # =========================================================================
+        # LÓGICA DO RECORDE DE OCUPAÇÃO (PICO MÁXIMO)
+        # =========================================================================
+        if stable_count > self.peak_count and stable_count > 0:
+            self._update_peak_record(stable_count, display_frame)
+
+        return display_frame, stable_count
+
+    def _update_peak_record(self, new_peak, record_frame):
+        """Salva e registra o novo recorde com fotografia e timestamp oficial."""
+        now_dt = datetime.now()
+        date_str = now_dt.strftime("%d/%m/%Y")
+        time_str = now_dt.strftime("%H:%M:%S")
+        timestamp_str = f"{date_str} às {time_str}"
+
+        self.peak_count = new_peak
+        self.peak_date = date_str
+        self.peak_time = time_str
+        self.peak_timestamp = timestamp_str
+        self.is_new_peak = True
+
+        # Cria uma cópia com faixa dourada oficial de recorde
+        snapshot = record_frame.copy()
+        sh, sw, _ = snapshot.shape
+        banner_h = 46
+
+        sub_overlay = snapshot.copy()
+        cv2.rectangle(sub_overlay, (0, sh - banner_h), (sw, sh), (0, 20, 40), -1)
+        cv2.addWeighted(sub_overlay, 0.85, snapshot, 0.15, 0, snapshot)
+        cv2.rectangle(snapshot, (0, sh - banner_h), (sw, sh), (0, 215, 255), 2)
+
+        watermark_text = f"RECORDE: {new_peak} PESSOAS  |  REGISTRADO EM: {timestamp_str}"
+        cv2.putText(snapshot, watermark_text, (15, sh - 16),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.52, (0, 240, 255), 2, cv2.LINE_AA)
+
+        # Salva em memória (JPEG bytes)
+        ret, jpeg = cv2.imencode('.jpg', snapshot, [cv2.IMWRITE_JPEG_QUALITY, 88])
+        if ret:
+            self.peak_image_bytes = jpeg.tobytes()
+
+        # Salva a fotografia fisicamente em disco
+        try:
+            cv2.imwrite(self.peak_file_path, snapshot)
+        except Exception as e:
+            print(f"[RECORDE] Erro ao salvar snapshot no disco: {e}")
+
+        # Salva o arquivo JSON com os dados do recorde
+        self.save_persisted_record()
+
+        self._log_event(f"🏆 NOVO RECORDE: {new_peak} pessoas simultâneas no salão!", "record")
+        print(f"[RECORDE] 🏆 NOVO RECORDE: {new_peak} pessoas registradas em {timestamp_str}")
+
+    def reset_peak_record(self):
+        """Zera o recorde atual e remove os arquivos gravados."""
+        with self.lock:
+            self.peak_count = 0
+            self.peak_date = "--/--/----"
+            self.peak_time = "--:--:--"
+            self.peak_timestamp = "Aguardando primeiro registro"
+            self.peak_image_bytes = None
+            self.is_new_peak = False
+
+            if os.path.exists(self.peak_file_path):
+                try:
+                    os.remove(self.peak_file_path)
+                except Exception:
+                    pass
+
+            if os.path.exists(self.record_json_path):
+                try:
+                    os.remove(self.record_json_path)
+                except Exception:
+                    pass
+
+            self._log_event("Recorde de ocupação zerado pelo operador.", "warning")
+            print("[RECORDE] Recorde zerado com sucesso.")
+
+    def _open_camera_safely(self, index, timeout=5.0):
+        """
+        Tenta abrir a câmera testando backends compatíveis em threads com timeout:
+        1. CAP_MSMF  - Microsoft Media Foundation (Logitech C920 e webcams modernas)
+        2. CAP_DSHOW - DirectShow (fallback legado)
+        3. CAP_ANY   - Automático
+        """
+        backends = [
+            ("MSMF", cv2.CAP_MSMF),
+            ("DSHOW", cv2.CAP_DSHOW),
+            ("ANY", cv2.CAP_ANY)
+        ]
+
+        for name, backend_id in backends:
+            result = [None]
+
+            def _try():
+                try:
+                    cap = cv2.VideoCapture(index, backend_id)
+                    if cap is not None and cap.isOpened():
+                        ret, frame = cap.read()
+                        if ret and frame is not None:
+                            result[0] = cap
+                        else:
+                            cap.release()
+                except Exception:
+                    pass
+
+            t = threading.Thread(target=_try, daemon=True)
+            t.start()
+            t.join(timeout=timeout)
+
+            if result[0] is not None:
+                print(f"[CÂMERA] ✅ Câmera {index} aberta com sucesso via {name}!")
+                # Ajusta resolução se suportado
+                try:
+                    result[0].set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                    result[0].set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                except Exception:
+                    pass
+                return result[0]
+
+        return None
+
+    def _create_mock_panoramic_frame(self, t):
+        """Frame de simulação de alta qualidade quando não há câmera conectada."""
+        h, w = 480, 640
+        mock = np.zeros((h, w, 3), dtype=np.uint8)
+
+        # Fundo escuro com gradiente
+        for y in range(h):
+            val = int(24 + (y / h) * 35)
+            mock[y, :] = (val - 5, val, val + 10)
+
+        # Linhas de perspectiva arquitetural
+        cv2.line(mock, (0, 80), (w // 2, 200), (50, 60, 75), 1)
+        cv2.line(mock, (w, 80), (w // 2, 200), (50, 60, 75), 1)
+        cv2.line(mock, (w // 2, 200), (w // 2, h), (40, 50, 65), 1)
+
+        # Simula entre 3 e 6 pessoas virtuais em movimento
+        cycle = int(t % 30)
+        sim_count = 3 + (cycle % 4)
+
+        for i in range(sim_count):
+            bx = int(140 + (i * 95) + np.sin(t * 0.8 + i) * 35)
+            by = int(250 + (i % 3) * 55 + np.cos(t * 0.6 + i) * 18)
+
+            # Silhueta
+            cv2.circle(mock, (bx, by - 45), 13, (140, 190, 240), -1)
+            cv2.ellipse(mock, (bx, by), (18, 34), 0, 0, 360, (100, 150, 200), -1)
+
+            # Caixa Neon
+            x1, y1 = bx - 24, by - 65
+            x2, y2 = bx + 24, by + 40
+            cv2.rectangle(mock, (x1, y1), (x2, y2), (255, 240, 0), 2)
+            cv2.putText(mock, f"Pessoa {i + 1}", (x1, y1 - 6),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 240, 0), 1)
+
+        # Rodapé pedagógico
+        cv2.putText(mock, "[MODO DEMO: CONECTE UMA WEBCAM FISICA PARA DETECCAO REAL]",
+                    (35, h - 18), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (180, 200, 220), 1)
+
+        return mock, sim_count
 
     def run_camera_threads(self):
-        """Inicia os loops das 2 câmeras em threads independentes."""
-        t1 = threading.Thread(target=self._cam1_loop, daemon=True)
-        t2 = threading.Thread(target=self._cam2_loop, daemon=True)
+        """Inicia o loop de captura e IA em thread desacoplada."""
         self.is_running = True
+        t1 = threading.Thread(target=self._cam1_loop, daemon=True)
         t1.start()
-        t2.start()
 
     def _cam1_loop(self):
-        """Loop da Câmera 1 (Panorâmica)."""
-        cap1 = cv2.VideoCapture(self.cam1_source)
-        if not cap1.isOpened():
-            print(f"[DUAL CAM] Câmera 1 ({self.cam1_source}) não encontrada. Usando canal padrão 0...")
-            cap1 = cv2.VideoCapture(0)
+        """Loop contínuo de captura e processamento da Câmera Panorâmica Única."""
+        cap1 = self._open_camera_safely(self.cam1_source)
+
+        if cap1 is None and self.cam1_source != 0:
+            print("[CÂMERA] Tentando índice alternativo 0...")
+            cap1 = self._open_camera_safely(0)
+
+        is_camera_available = (cap1 is not None and cap1.isOpened())
+        self.camera_online = is_camera_available
+
+        if not is_camera_available:
+            print("[CÂMERA] Nenhuma webcam física detectada. Ativando Modo de Simulação Panorâmica.")
+
+        last_reconnect_attempt = time.time()
 
         while self.is_running:
-            ret, frame = cap1.read()
-            if not ret or frame is None:
-                # Simulação para caso de apenas 1 câmera física estar conectada
-                mock = np.zeros((360, 480, 3), dtype=np.uint8)
-                cv2.putText(mock, "CAMERA 1: PANORAMICA (SALAO)", (30, 160),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-                cv2.putText(mock, "Conecte a camera interna do teto", (50, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
+            now_t = time.time()
+
+            # Se não estiver com câmera aberta, tenta reconectar a cada 5 segundos
+            if not is_camera_available:
+                if now_t - last_reconnect_attempt >= 5.0:
+                    last_reconnect_attempt = now_t
+                    new_cap = self._open_camera_safely(self.cam1_source, timeout=3.0)
+                    if new_cap is not None:
+                        cap1 = new_cap
+                        is_camera_available = True
+                        self.camera_online = True
+                        print("[CÂMERA] Câmera física reconectada com sucesso!")
+
+            if is_camera_available and cap1 is not None:
+                ret, frame = cap1.read()
+                if not ret or frame is None:
+                    # Desconexão momentânea da câmera
+                    self.camera_online = False
+                    is_camera_available = False
+                    if cap1 is not None:
+                        cap1.release()
+                        cap1 = None
+                    continue
+
+                self.camera_online = True
+                processed, count = self.process_panoramic(frame)
+                with self.lock:
+                    self.frame_panoramic = processed
+                    self.count_panoramic = count
+                time.sleep(0.01)
+            else:
+                # Simulação contínua e suave
+                mock, count = self._create_mock_panoramic_frame(now_t)
+
+                # Barra no topo do frame simulado
+                overlay = mock.copy()
+                w = mock.shape[1]
+                cv2.rectangle(overlay, (0, 0), (w, 42), (10, 15, 25), -1)
+                cv2.addWeighted(overlay, 0.75, mock, 0.25, 0, mock)
+
+                cv2.circle(mock, (20, 21), 6, (0, 200, 255), -1)
+                cv2.putText(mock, "SIMULADOR PANORAMICO", (34, 26),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2, cv2.LINE_AA)
+
+                count_text = f"PESSOAS NA SALA: {count}"
+                (cw, _), _ = cv2.getTextSize(count_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
+                cv2.putText(mock, count_text, (w - cw - 20, 26),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 128), 2, cv2.LINE_AA)
+
+                if count > self.peak_count and count > 0:
+                    self._update_peak_record(count, mock)
+
                 with self.lock:
                     self.frame_panoramic = mock
-                time.sleep(0.05)
-                continue
+                    self.count_panoramic = count
 
-            processed, p_count = self.process_panoramic(frame)
-            with self.lock:
-                self.frame_panoramic = processed
-                self.count_panoramic = p_count
+                time.sleep(0.04)
 
-        cap1.release()
+            # Cálculo de FPS
+            self._frame_count += 1
+            elapsed = time.time() - self._fps_start_time
+            if elapsed >= 1.0:
+                self.fps_cam1 = round(self._frame_count / elapsed, 1)
+                self._frame_count = 0
+                self._fps_start_time = time.time()
 
-    def _cam2_loop(self):
-        """Loop da Câmera 2 (Porta com Linha)."""
-        cap2 = cv2.VideoCapture(self.cam2_source)
-        if not cap2.isOpened():
-            # Se a segunda câmera não existir, usa a primeira ou mock
-            print(f"[DUAL CAM] Câmera 2 ({self.cam2_source}) não encontrada. Aguardando conexão...")
-            cap2 = cv2.VideoCapture(0)
-
-        while self.is_running:
-            ret, frame = cap2.read()
-            if not ret or frame is None:
-                mock = np.zeros((360, 480, 3), dtype=np.uint8)
-                cv2.putText(mock, "CAMERA 2: PORTA (FLUXO)", (50, 160),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 2)
-                cv2.putText(mock, "Conecte a webcam da portaria", (60, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
-                with self.lock:
-                    self.frame_door = mock
-                time.sleep(0.05)
-                continue
-
-            processed = self.process_door(frame)
-            with self.lock:
-                self.frame_door = processed
-
-        cap2.release()
+        if cap1 is not None and cap1.isOpened():
+            cap1.release()
 
     def get_jpeg_cam1(self):
+        """Retorna os bytes em JPEG para o stream contínuo MJPEG."""
         with self.lock:
-            if self.frame_panoramic is None: return None
-            ret, jpeg = cv2.imencode('.jpg', self.frame_panoramic, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            if self.frame_panoramic is None:
+                return None
+            ret, jpeg = cv2.imencode('.jpg', self.frame_panoramic, [cv2.IMWRITE_JPEG_QUALITY, 82])
             return jpeg.tobytes() if ret else None
 
-    def get_jpeg_cam2(self):
+    def get_peak_jpeg(self):
+        """Retorna os bytes da fotografia oficial do momento recorde."""
         with self.lock:
-            if self.frame_door is None: return None
-            ret, jpeg = cv2.imencode('.jpg', self.frame_door, [cv2.IMWRITE_JPEG_QUALITY, 75])
-            return jpeg.tobytes() if ret else None
+            if self.peak_image_bytes is not None:
+                return self.peak_image_bytes
+            if os.path.exists(self.peak_file_path):
+                try:
+                    with open(self.peak_file_path, "rb") as f:
+                        self.peak_image_bytes = f.read()
+                        return self.peak_image_bytes
+                except Exception:
+                    pass
+            return None
 
     def get_status(self):
+        """
+        Retorna o dicionário com os dados em tempo real consumidos pelo painel HTML:
+        - current_count: contagem ao vivo estabilizada
+        - record_count: maior pico de pessoas já registrado
+        - record_photo: URL da foto do recorde
+        - record_date e record_time: momento exato do recorde
+        - fps: taxa de quadros
+        - ai_model: identificação do modelo de IA
+        """
         with self.lock:
-            # Ocupação considerada para a porta: usa o maior entre a panorâmica e a catraca
-            # para garantir máxima segurança contra superlotação!
-            audited_occupancy = max(self.count_panoramic, self.count_gate)
-            diff = abs(self.count_panoramic - self.count_gate)
+            current = self.count_panoramic
+            has_peak = (self.peak_count > 0 and self.peak_image_bytes is not None)
+            photo_url = "/api/record_snapshot" if has_peak else None
 
-            pct = round((audited_occupancy / self.room_capacity * 100), 1) if self.room_capacity > 0 else 0
-
-            if audited_occupancy >= self.room_capacity:
-                status_label = "SALA LOTADA - AGUARDE"
-                status_color = "danger"
-            elif pct >= 80:
-                status_label = "ATENÇÃO - QUASE CHEIA"
-                status_color = "warning"
-            else:
-                status_label = "ENTRADA PERMITIDA"
-                status_color = "success"
+            pct = round((current / self.room_capacity * 100), 1) if self.room_capacity > 0 else 0
 
             return {
-                "count_panoramic": self.count_panoramic,
-                "count_gate": self.count_gate,
-                "in_count": self.in_count,
-                "out_count": self.out_count,
-                "audited_occupancy": audited_occupancy,
+                # Campos principais consumidos pelo dual_monitor.html
+                "current_count": current,
+                "record_count": self.peak_count,
+                "record_photo": photo_url,
+                "record_date": self.peak_date if self.peak_count > 0 else "Aguardando registro",
+                "record_time": self.peak_time if self.peak_count > 0 else "--:--:--",
+                "record_timestamp": self.peak_timestamp,
+                "fps": self.fps_cam1,
+                "ai_model": "YOLOv8n" if self.use_yolo else "OpenCV HOG",
                 "room_capacity": self.room_capacity,
                 "occupancy_pct": min(100, pct),
-                "discrepancy": diff,
-                "audit_status": "CONVERGÊNCIA PERFEITA" if diff == 0 else f"DIVERGÊNCIA ({diff})",
-                "status_label": status_label,
-                "status_color": status_color,
-                "events": self.events_log[:10]
+                "camera_online": self.camera_online,
+
+                # Aliases e compatibilidade com interfaces e testes existentes
+                "count_panoramic": current,
+                "audited_occupancy": current,
+                "peak_count": self.peak_count,
+                "peak_photo": photo_url,
+                "peak_date": self.peak_date,
+                "peak_time": self.peak_time,
+                "is_new_peak": self.is_new_peak,
+                "events": self.events_log[:6]
             }
